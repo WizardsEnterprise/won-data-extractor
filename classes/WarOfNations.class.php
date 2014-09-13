@@ -1,12 +1,12 @@
 <?php
-require_once('DatabaseFactory.class.php');
-require_once('WorldMap.class.php');
-require_once('World.class.php');
-require_once('Player.class.php');
-require_once('Guild.class.php');
-require_once('Device.class.php');
-require_once('Building.class.php');
-require_once('Proxy.class.php');
+require_once('data/DatabaseFactory.class.php');
+require_once('data/WorldMap.class.php');
+require_once('data/World.class.php');
+require_once('data/Player.class.php');
+require_once('data/Guild.class.php');
+require_once('data/Device.class.php');
+require_once('data/Building.class.php');
+require_once('data/Proxy.class.php');
 
 class Constants {
 	// Base URL

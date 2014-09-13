@@ -5,7 +5,7 @@
 <body>
 <?php
 
-require_once('WarOfNations.class.php');
+require_once('classes/WarOfNations.class.php');
 
 $debug = false;
 
