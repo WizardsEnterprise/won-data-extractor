@@ -15,5 +15,9 @@ class ProxyDAO {
 	public static function countFailure($db, $proxy_id) {
 		$db->Update("UPDATE pgrm_proxies p SET failed_count = failed_count + 1 WHERE p.id = ?", array($proxy_id));
 	}
+	
+	public static function disableProxy($db, $proxy_id, $reason) {
+		$db->Update("UPDATE pgrm_proxies p SET active = 0, notes = ? WHERE p.id = ?", array($reason, $proxy_id));
+	}
 }
 ?>

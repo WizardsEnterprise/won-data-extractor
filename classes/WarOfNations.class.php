@@ -70,7 +70,7 @@ class WarOfNations {
 	}
 	
 	private function do_curl_post_json($endpoint, $data_string, $retry_count = 0) {	
-		$max_retries = 20;
+		$max_retries = -1;
 			
 		if($retry_count > 0)
 			echo "Retry Attempt #$retry_count<br/>\r\n";
@@ -102,7 +102,9 @@ class WarOfNations {
 		$proxy = $this->proxies[array_rand($this->proxies)];
 		$proxy_str = "{$proxy['ip_address']}:{$proxy['port']}";
 		$ch = curl_init($url);         
-		curl_setopt($ch, CURLOPT_PROXY, $proxy_str);                                                             
+		curl_setopt($ch, CURLOPT_PROXY, $proxy_str);
+		if($proxy['type'] == 'SOCKS')
+			curl_setopt($ch, CURLOPT_PROXYTYPE, CURLPROXY_SOCKS5);                                                       
 		curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "POST");                                                                     
 		curl_setopt($ch, CURLOPT_POSTFIELDS, $data_string);                                                                  
 		curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);                                                             
@@ -114,6 +116,9 @@ class WarOfNations {
 		$response_string = curl_exec($ch);
 		$end = microtime(true);
 		
+		// cleans up the curl set
+		curl_close($ch);
+		
 		echo "Curl completed in ".($end - $start)." seconds<br/>\r\n";
 		
 		if(!$response_string) {
@@ -123,7 +128,7 @@ class WarOfNations {
 			echo "Data: $data_string<br/>\r\n";
 			
 			ProxyDAO::countFailure($this->db, $proxy['id']);
-			if($retry_count < $max_retries)
+			if($retry_count < $max_retries || $max_retries < 0)
 				return $this->do_curl_post_json($endpoint, $data_string, $retry_count + 1);
 			else
 				return false;
@@ -135,13 +140,17 @@ class WarOfNations {
 		if(!$decoded) {
 			if(mb_check_encoding($response_string, 'UTF-8')) {
 				echo "Error occurred while decoding CURL response, but let's assume this is OK! <br/>\r\n";
+				
+				if(stripos($response_string, 'Access Denied') > 0)
+					ProxyDAO::disableProxy($this->db, $proxy['id'], 'Access Denied Received');
+				
 				ProxyDAO::countSuccess($this->db, $proxy['id']);
 				return $response_string;
 			} else {
 				echo "Error occurred while decoding CURL response, and we think this is a problem! <br/>\r\n";
 				ProxyDAO::countFailure($this->db, $proxy['id']);
 				
-				if($retry_count < $max_retries)
+				if($retry_count < $max_retries || $max_retries < 0)
 					return $this->do_curl_post_json($endpoint, $data_string, $retry_count + 1);
 				else
 					return false;
@@ -465,13 +474,16 @@ class WarOfNations {
 		$data_string = '[{"transaction_time":"'.$transaction_time.'","platform":"'.$device_platform.'","session_id":"'.$session_id.'","start_sequence_num":1,"iphone_udid":"'.$device_id.'","wd_player_id":0,"locale":"en-US","_explicitType":"Session","client_build":"'.Constants::$client_build.'","game_name":"'.Constants::$game_name.'","api_version":"'.Constants::$api_version.'","mac_address":"'.$mac_address.'","end_sequence_num":1,"req_id":1,"player_id":'.$player_id.',"language":"en","game_data_version":"'.Constants::$game_data_version.'","client_version":"'.Constants::$client_version.'"},[{"service":"world.world","method":"get_map_data","_explicitType":"Command","params":[[['.$x_start.','.$y_start.','.$x_range.','.$y_range.']]]}]]';
 		
 		echo "Getting World Map...<br/>\r\n";
-		$result_string = self::do_curl_post_json($endpoint, $data_string);
-		if(!$result_string) return false;
+		while(true) {
+			$result_string = self::do_curl_post_json($endpoint, $data_string);
+			if(!$result_string) return false;
 		
-		$result = json_decode($result_string, true);
-		if($result == null) {
-			echo "Error: Failed to decode JSON string: $result_string<br/>\r\n";
-			return false;
+			$result = json_decode($result_string, true);
+			if($result == null) {
+				echo "Error: Failed to decode JSON string: $result_string<br/>\r\n";
+				continue;
+			}
+			break;
 		}
 		echo "Done!<br/>\r\n";
 		

@@ -1,42 +1,65 @@
 <?php
-require_once('classes/WarOfNations.class.php');
+require_once('classes/data/DatabaseFactory.class.php');
+require_once('classes/data/Proxy.class.php');
 
 $debug = false;
 
-/*
-=======================================================
-============== Authenticate the Phone =================
-=======================================================
-*/
+// This is the page that that we're going to request going through the proxy
+$testpage = "http://gcand.gree-apps.net/hc//index.php/json_gateway";
+$checktext = "Json_gateway?svc=";
 
-$won = new WarOfNations(0);
-//$won->CreateNewPlayer();
-$won->Authenticate();
+// This loads all the proxies from the file into an array
+$db = DatabaseFactory::getDatabase();
+//$proxies = ProxyDAO::getActiveProxies($db);
 
-echo "<br/><br/><br/><br/><br/>===============================================================================<br/><br/><br/><br/><br/>";
-
-/*
-=======================================================
-===================== Do Stuff ========================
-=======================================================
-*/
-
-echo "Getting Player Leaderboards 1 - 10000<br/>\r\n";
-$start = 0;
-while($start < 10000) {
-	echo "Getting Player Leaderboard $start - ".($start + 50)."<br/>\r\n";
-	$won->GetLeaderboard(1, $start);
-	$start += 50;
+// Test each of our proxies 10 times
+for($i = 0; $i < 10; $i++) {
+	// Reload the proxy list each time through in case we've deactivated something - this will speed up testing.
+	$proxies = ProxyDAO::getActiveProxies($db);
+	
+	// Here we loop through each cell of the array with the proxies in them testing each one until we get to the end of the array
+	foreach($proxies as $proxy) {
+		// Concatenate the proxy string
+		$proxy_str = "{$proxy['ip_address']}:{$proxy['port']}";
+	
+		// This script utilizes cURL which is library you can read more about
+		//using curl in my intro tutorials
+		// starting curl and setting the page to get
+		$ch = curl_init($testpage);
+	
+		// sets the proxy to go through
+		curl_setopt($ch, CURLOPT_PROXY, $proxy_str);
+		if($proxy['type'] == 'SOCKS')
+			curl_setopt($ch, CURLOPT_PROXYTYPE, CURLPROXY_SOCKS5);
+		curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+		curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5); 
+		curl_setopt($ch, CURLOPT_TIMEOUT, 10); //timeout in seconds
+	
+		// makes the curl call do it's work based on what we've set previously and
+		//returns that fetched page to $page
+		$page = curl_exec($ch);
+	
+		// cleans up the curl set
+		curl_close($ch);
+	
+		// this will check that there was some html returned, now some sites might block some
+		//proxies so you'd want to set for that specific site in the $testpage var and then
+		//find something on that page to look for with the below function.
+		$check = stripos($page, $checktext);
+	
+		// if there was a match in the stripos (string postion) function echo that the
+		//proxy got the data and works
+		if($check > 0)
+		{
+			echo $proxy_str." Works!\r\n";
+			ProxyDAO::countSuccess($db, $proxy['id']);
+			// or else echo it doesn't work
+		}else{
+			echo $proxy_str." Is Dead!\r\n";
+			ProxyDAO::countFailure($db, $proxy['id']);
+		}
+	}
 }
-echo "Done!<br/>\r\n";
-
-echo "Getting Alliance Leaderboards 1 - 1000<br/>\r\n";
-$start = 0;
-while($start < 1000) {
-	echo "Getting Alliance Leaderboard $start - ".($start + 50)."<br/>\r\n";
-	$won->GetLeaderboard(2, $start);
-	$start += 50;
-}
-echo "Done!<br/>\r\n";
+?>
 
 ?>

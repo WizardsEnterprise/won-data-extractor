@@ -27,9 +27,16 @@ echo "<br/>\r\n<br/>\r\n<br/>\r\n<br/>\r\n<br/>\r\n=============================
 =======================================================
 */
 
-$inner_radius = 0;
-$radius = 1500;
+//$radius = 1472;
+$radius = 200;
 $r2 = pow($radius, 2);
+$interval = 95;
+$r2_offset = pow($radius + $interval, 2) - $r2;
+
+// If we want to get a scan of an area around a base, change these values
+$inner_x = -573;
+$inner_y = 228;
+
 $cur_x = 0;
 $cur_y = 0;
 $cur_quadrant = 0; // 0 = top left, 1 = top right, 2 = bottom right, 3 = bottom left
@@ -41,28 +48,28 @@ $status = true;
 
 //ob_end_flush();
 
-
+$start = microtime(true);
 
 //try {
-while($cur_quadrant <= 1) {
-	while($cur_y < $radius) {
-		while(pow($cur_x, 2) + pow($cur_y, 2) <= $r2) {
+while($cur_quadrant <= 3) {
+	while($cur_y < $radius + ($cur_quadrant < 2 ? 0 : $interval)) {
+		while(pow($cur_x, 2) + pow($cur_y, 2) <= $r2 + ($cur_quadrant == 2 ? 0 : $r2_offset)) {
 			switch($cur_quadrant) {
 				case 0:
-					$tx = -1 * $cur_x;
-					$ty = -1 * $cur_y;
+					$tx = $inner_x + (-1 * $cur_x);
+					$ty = $inner_y + (-1 * $cur_y);
 					break;
 				case 1:
-					$tx = $cur_x;
-					$ty = -1 * $cur_y;
+					$tx = $inner_x + $cur_x;
+					$ty = $inner_y + (-1 * $cur_y);
 					break;
 				case 2:
-					$tx = $cur_x;
-					$ty = $cur_y;
+					$tx = $inner_x + $cur_x;
+					$ty = $inner_y + $cur_y;
 					break;
 				case 3:
-					$tx = -1 * $cur_x;
-					$ty = $cur_y;
+					$tx = $inner_x + (-1 * $cur_x);
+					$ty = $inner_y + $cur_y;
 					break;
 			}
 		
@@ -74,11 +81,11 @@ while($cur_quadrant <= 1) {
 				break;
 			}
 			
-			$cur_x += 95;
-			usleep(1000000); // Wait a second between calls
+			$cur_x += $interval;
+			usleep(500000); // Wait half a second between calls - just because
 		}
 		if(!$status) break;
-		$cur_y += 95;
+		$cur_y += $interval;
 		$cur_x = 0;
 	}
 	if(!$status) break;
@@ -86,7 +93,9 @@ while($cur_quadrant <= 1) {
 	$cur_y = 0;
 }
 
-echo "$count calls to map service.";
+$end = microtime(true);
+
+echo "$count calls to map service in ".($end - $start)." seconds.<br/>\r\n";
 
 /*
 0, -380
@@ -100,7 +109,7 @@ $won->GetWorldMap(-95, -380, 100, 100);
 $won->GetWorldMap(-190, -380, 100, 100);
 $won->GetWorldMap(-285, -380, 100, 100);*/
 //$won->GetWorldMap(-380, -380, 100, 100);
-//$won->GetWorldMap(-475, -380, 100, 100);
+//$won->GetWorldMap(-1520, -380, 100, 100);
 
 # CODE THAT NEEDS IMMEDIATE FLUSHING
 
