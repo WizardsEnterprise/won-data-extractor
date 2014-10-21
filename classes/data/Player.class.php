@@ -6,11 +6,15 @@ class PlayerDAO {
 		return $db->select("SELECT * FROM players");
 	}
 	
+	public static function getPlayerById($db, $player_id) {
+		return $db->select("SELECT * FROM players WHERE id=?", array($game_id));
+	}
+	
 	public static function getLocalIdFromGameId($db, $game_id) {
 		return $db->selectValue("SELECT id FROM players WHERE game_player_id=?", array($game_id));
 	}
 	
-	public static function insertPlayer($db, $Player) {
+	public static function insertPlayer($db, $Player, $hist = false) {
 		global $debug;
 		
 		if($debug) {
@@ -21,7 +25,8 @@ class PlayerDAO {
 		$paramValues = PlayerMapper::GetParamValues($Player, 'Insert');
 		$params = rtrim(str_repeat('?, ', count($paramValues)), ', ');
 		
-		$sql = "INSERT INTO `players` ($cols) VALUES ($params)";
+		$hist_tbl = $hist ? '_hist' : '';
+		$sql = "INSERT INTO `players$hist_tbl` ($cols) VALUES ($params)";
 		
 		if($debug) {
 			echo 'SQL Query:'.PHP_EOL;
@@ -39,6 +44,9 @@ class PlayerDAO {
 		if($debug) {
 			echo 'PlayerDAO::updatePlayer'.PHP_EOL;
 		}
+		
+		//$existing_player = self::getPlayerById($db, $Player->id);
+		//self::insertPlayer($db, $existing_player, true);
 		
 		$updateStr = '`'.implode('`=?, `', PlayerMapper::ColumnNames('Update', $customExcludes)).'`=?';
 		$paramValues = PlayerMapper::GetParamValues($Player, 'Update', $customExcludes);
@@ -60,7 +68,7 @@ class PlayerDAO {
 class PlayerMapper extends MapperBase {
 	public static $mapping = array('id' => 'id', 'world_id' => 'world_id', 'game_player_id' => 'game_player_id',
 								   'player_name' => 'player_name', 'level' => 'level', 'battle_points' => 'battle_points', 
-								   'bases' => 'bases', 'guild_id' => 'guild_id');
+								   'bases' => 'bases', 'guild_id' => 'guild_id', 'data_load_id' => 'data_load_id');
 	
 	public static $excludeFromInsert = array('id');
 	public static $excludeFromUpdate = array('id', 'world_id', 'game_player_id');
@@ -85,6 +93,7 @@ class Player {
 	public $level;
 	public $bases;
 	public $guild_id;
+	public $data_load_id;
 	
 	public static function FromJson($json) {
 		global $debug;
@@ -100,6 +109,34 @@ class Player {
 		{	
 			if(property_exists($obj, $key)) {
 				$obj->$key = $value;
+			}
+		}
+		
+		if($debug) {
+			echo 'Player Object:'.PHP_EOL;
+			var_dump($obj);
+		}
+		
+		return $obj;
+	}
+	
+	public static function FromDB($player) {
+		global $debug;
+		
+		if($debug) {
+			echo 'Player::FromDB'.PHP_EOL;
+			echo 'DB Array:'.PHP_EOL;
+			print_r($player);
+		}
+		$obj = new Player();
+		
+		foreach ($player as $key => $value)
+		{	
+			if($obj_key = array_search($value, PlayerMapper::$mapping))
+			{
+				if(property_exists($obj, $obj_key)) {
+					$obj->$obj_key = $value;
+				}
 			}
 		}
 		

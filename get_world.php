@@ -6,8 +6,7 @@
 <?php
 
 require_once('classes/WarOfNations.class.php');
-
-$debug = false;
+require_once('classes/data/DataLoad.class.php');
 
 /*
 =======================================================
@@ -16,6 +15,10 @@ $debug = false;
 */
 
 $won = new WarOfNations(0);
+
+$won->data_load_id = DataLoadDAO::initNewLoad($won->db, 'WORLD_MAP');
+DataLoadDAO::startLoad($won->db, $won->data_load_id);
+
 //$won->CreateNewPlayer();
 $won->Authenticate();
 
@@ -27,15 +30,15 @@ echo "<br/>\r\n<br/>\r\n<br/>\r\n<br/>\r\n<br/>\r\n=============================
 =======================================================
 */
 
-//$radius = 1472;
-$radius = 200;
+$radius = 1472;
+//$radius = 200;
 $r2 = pow($radius, 2);
 $interval = 95;
 $r2_offset = pow($radius + $interval, 2) - $r2;
 
 // If we want to get a scan of an area around a base, change these values
-$inner_x = -573;
-$inner_y = 228;
+$inner_x = 0;
+$inner_y = 0;
 
 $cur_x = 0;
 $cur_y = 0;
@@ -52,8 +55,8 @@ $start = microtime(true);
 
 //try {
 while($cur_quadrant <= 3) {
-	while($cur_y < $radius + ($cur_quadrant < 2 ? 0 : $interval)) {
-		while(pow($cur_x, 2) + pow($cur_y, 2) <= $r2 + ($cur_quadrant == 2 ? 0 : $r2_offset)) {
+	while(sqrt(pow($cur_y, 2) - pow($cur_y/2, 2)) < $radius + ($cur_quadrant > 1 ? 0 : $interval)) {
+		while(pow($cur_x, 2) + pow($cur_y, 2) - pow($cur_y/2, 2) <= $r2 + ($cur_quadrant == 2 ? 0 : $r2_offset)) {
 			switch($cur_quadrant) {
 				case 0:
 					$tx = $inner_x + (-1 * $cur_x);
@@ -72,7 +75,7 @@ while($cur_quadrant <= 3) {
 					$ty = $inner_y + $cur_y;
 					break;
 			}
-		
+			
 			$count++;
 			echo "$tx, $ty<br/>\r\n";
 			$status = $won->GetWorldMap($tx, $ty, 100, 100);
@@ -96,6 +99,8 @@ while($cur_quadrant <= 3) {
 $end = microtime(true);
 
 echo "$count calls to map service in ".($end - $start)." seconds.<br/>\r\n";
+
+DataLoadDAO::loadComplete($won->db, $won->data_load_id);
 
 /*
 0, -380

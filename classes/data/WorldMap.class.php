@@ -61,7 +61,7 @@ class HexMapper {
 								   'town_name' => 'town_name', 'building_id' => 'building_id', 
 								   'building_unique_id' => 'building_unique_id', 'version' => 'version', 
 								   'resource_id' => 'resource_id', 'resource_level' => 'resource_level',
-								   'destroyed' => 'destroyed');
+								   'destroyed' => 'destroyed', 'data_load_id' => 'data_load_id');
 	
 	public static $excludeFromInsert = array('id');
 	public static $excludeFromUpdate = array('id', 'world_id', 'x_coord', 'y_coord');
@@ -97,6 +97,7 @@ class Hex {
 	public $resource_id;
 	public $resource_level;
 	public $destroyed;
+	public $data_load_id;
 	
 	public static function FromJson($json) {
 		global $debug;

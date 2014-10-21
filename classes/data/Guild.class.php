@@ -59,7 +59,8 @@ class GuildDAO {
 
 class GuildMapper extends MapperBase{
 	public static $mapping = array('id' => 'id', 'world_id' => 'world_id', 'game_guild_id' => 'game_guild_id', 'leader_id' => 'leader_id',
-								   'guild_name' => 'guild_name', 'battle_points' => 'battle_points', 'members' => 'members');
+								   'guild_name' => 'guild_name', 'battle_points' => 'battle_points', 'members' => 'members',
+								   'data_load_id' => 'data_load_id');
 	
 	public static $excludeFromInsert = array('id');
 	public static $excludeFromUpdate = array('id', 'world_id', 'game_guild_id');
@@ -83,6 +84,7 @@ class Guild {
 	public $guild_name;
 	public $battle_points;
 	public $members;
+	public $data_load_id;
 	
 	public static function FromJson($json) {
 		global $debug;
