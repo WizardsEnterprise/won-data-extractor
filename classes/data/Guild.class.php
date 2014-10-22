@@ -1,5 +1,6 @@
 <?php
 require_once('MapperBase.class.php');
+require_once('ModelBase.class.php');
 
 class GuildDAO {
 	public static function getAllGuilds($db) {
@@ -57,7 +58,7 @@ class GuildDAO {
 	}
 }
 
-class GuildMapper extends MapperBase{
+class GuildMapper {
 	public static $mapping = array('id' => 'id', 'world_id' => 'world_id', 'game_guild_id' => 'game_guild_id', 'leader_id' => 'leader_id',
 								   'guild_name' => 'guild_name', 'battle_points' => 'battle_points', 'members' => 'members',
 								   'data_load_id' => 'data_load_id');
@@ -76,7 +77,7 @@ class GuildMapper extends MapperBase{
 	}
 }
 
-class Guild {
+class Guild extends ModelBase {
 	public $id;
 	public $world_id;
 	public $game_guild_id;
@@ -85,30 +86,6 @@ class Guild {
 	public $battle_points;
 	public $members;
 	public $data_load_id;
-	
-	public static function FromJson($json) {
-		global $debug;
-		
-		if($debug) {
-			echo 'Guild::FromJson'.PHP_EOL;
-			echo 'JSON Array:'.PHP_EOL;
-			print_r($json);
-		}
-		$obj = new Guild();
-		
-		foreach ($json as $key => $value)
-		{	
-			if(property_exists($obj, $key)) {
-				$obj->$key = $value;
-			}
-		}
-		
-		if($debug) {
-			echo 'Guild Object:'.PHP_EOL;
-			var_dump($obj);
-		}
-		
-		return $obj;
-	}
+	public $mapper = 'GuildMapper';
 }
 ?>

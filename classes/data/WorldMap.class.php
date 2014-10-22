@@ -1,4 +1,7 @@
 <?php
+require_once('MapperBase.class.php');
+require_once('ModelBase.class.php');
+
 class WorldMapDAO {
 	public static function getAllHexes($db) {
 		return $db->select("SELECT * FROM world_hexes");
@@ -77,7 +80,7 @@ class HexMapper {
 	}
 }
 
-class Hex {
+class Hex extends ModelBase {
 	public $id;
 	public $world_id;
 	public $hex_x;
@@ -98,30 +101,6 @@ class Hex {
 	public $resource_level;
 	public $destroyed;
 	public $data_load_id;
-	
-	public static function FromJson($json) {
-		global $debug;
-		
-		if($debug) {
-			echo 'Hex::FromJson'.PHP_EOL;
-			echo 'JSON Array:'.PHP_EOL;
-			print_r($json);
-		}
-		$obj = new Hex();
-		
-		foreach ($json as $key => $value)
-		{	
-			if(property_exists($obj, $key)) {
-				$obj->$key = $value;
-			}
-		}
-		
-		if($debug) {
-			echo 'Hex Object:'.PHP_EOL;
-			var_dump($obj);
-		}
-		
-		return $obj;
-	}
+	public $mapper = 'HexMapper';
 }
 ?>

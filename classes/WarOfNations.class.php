@@ -9,25 +9,7 @@ require_once('data/Building.class.php');
 require_once('data/Proxy.class.php');
 require_once('data/DataLoad.class.php');
 require_once('data/DataLoadLog.class.php');
-
-class Constants {
-	// Base URL
-	public static $url_base = 'http://gcand.gree-apps.net/hc//index.php/json_gateway?svc=';
-	
-	// Service Endpoints
-	public static $authenticate = 'BatchController.authenticate_iphone';
-	public static $call = 'BatchController.call';
-	
-	// Game Information
-	public static $game_data_version = 'hc_20141001_40364'; //hc_20140908_38941
-	public static $game_name = 'HCGame';
-	public static $client_build = '277'; //251
-	public static $client_version = '1.8.6'; //1.8.4
-	public static $api_version = '1';
-	
-	// Hmac Authorization
-	public static $hmac_key = '%j75jY6pnJPs#TFBMDJ26*6U5hE544&zcZm7^kTua8%@awSTyAMG&&Z#mg23zKMb';
-}
+require_once('WarOfNationsWS.class.php');
 
 // Known Player IDs, Devices:
 // Main: 101013866213677, 66d2ea9883993b46e9f06fba6e652302 
@@ -63,6 +45,9 @@ class WarOfNations {
 	// List of proxy servers to use for connections.
 	private $proxies;
 	
+	// Web Service Helper
+	private $ws;
+	
 	function __construct($debug_level = 0) {
 		$this->debug_level = $debug_level;
 		if($debug_level >= 40) {
@@ -72,9 +57,15 @@ class WarOfNations {
 		
 		$this->db = DatabaseFactory::getDatabase();
 		$this->proxies = ProxyDAO::getActiveProxies($this->db);
+		$this->ws = new WarOfnationsWS($this->db, $this->proxies);
 	}
 	
-	private function do_curl_post_json($endpoint, $data_string, $retry_count = 0) {	
+	public function setDataLoadId($dlid) {
+		$this->data_load_id = $dlid;
+		$this->ws->data_load_id = $dlid;
+	}
+	
+	/*private function do_curl_post_json($endpoint, $data_string, $retry_count = 0) {	
 		$log_msg = "Attempt #$retry_count\r\n\r\n".$data_string;
 		$log_seq = 0;
 		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'DO_CURL_POST_JSON', $log_seq++, 'START', $endpoint, $log_msg);
@@ -136,7 +127,7 @@ class WarOfNations {
 		
 		if(!$response_string) {
 			$log_msg = "Proxy: $proxy_str<br/>\r\nURL: $url<br/>\r\nData: $data_string<br/>\r\n";
-			DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'DO_CURL_POST_JSON', $log_seq++, 'ERROR_CURL_RESPONSE', 'Error occurred during curl request', $log_msg);
+			DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'DO_CURL_POST_JSON', $log_seq++, 'ERROR_CURL_RESPONSE', 'Error occurred during curl request', $log_msg, 1);
 			
 			echo "Error occurred while getting Curl response.  Request: <br/>\r\n";
 			echo "Proxy: $proxy_str<br/>\r\n";
@@ -152,36 +143,43 @@ class WarOfNations {
 		
 		$decoded = gzdecode($response_string);
 		
-		// If we encountered an error in decoding, print the raw response.
+		// If we encountered an error in decoding, see what we can do with it
 		if(!$decoded) {
 			if(mb_check_encoding($response_string, 'UTF-8')) {
 				DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'DO_CURL_POST_JSON', $log_seq++, 'GZDECODE_QUESTIONABLE', 'Gzip decoding failed, but response is utf8 encoded.  We\'ll try to use it.', $response_string);
 				
 				echo "Error occurred while decoding CURL response, but let's assume this is OK! <br/>\r\n";
 				
-				if(stripos($response_string, 'Access Denied') > 0)
+				// If we think we got a proxy error, then log it, otherwise return the response 
+				if(stripos($response_string, 'The maximum web proxy user limit has been reached') > 0) {
+					DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'DO_CURL_POST_JSON', $log_seq++, 'PROXY_LIMIT_REACHED', null, null);
+					ProxyDAO::disableProxy($this->db, $proxy['id'], 'The maximum web proxy user limit has been reached');
+				} else if(stripos($response_string, '<title>Access Den') > 0) {
+					DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'DO_CURL_POST_JSON', $log_seq++, 'ACCESS_DENIED', null, null);
 					ProxyDAO::disableProxy($this->db, $proxy['id'], 'Access Denied Received');
-				
-				ProxyDAO::countSuccess($this->db, $proxy['id']);
-				return $response_string;
+				} else {
+					ProxyDAO::countSuccess($this->db, $proxy['id']);
+					return $response_string;
+				}
 			} else {
-				DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'DO_CURL_POST_JSON', $log_seq++, 'GZDECODE_FAILED', 'Gzip decoding failed, and we don\'t know what to do with it.  Retry this request.', $response_string);
+				DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'DO_CURL_POST_JSON', $log_seq++, 'GZDECODE_FAILED', 'Gzip decoding failed, and we don\'t know what to do with it.  Retry this request.', $response_string, 1);
 				
 				echo "Error occurred while decoding CURL response, and we think this is a problem! <br/>\r\n";
 				ProxyDAO::countFailure($this->db, $proxy['id']);
-				
-				if($retry_count < $max_retries || $max_retries < 0)
-					return $this->do_curl_post_json($endpoint, $data_string, $retry_count + 1);
-				else
-					return false;
 			}
+			
+			// If we made it this far then we need to retry 
+			if($retry_count < $max_retries || $max_retries < 0)
+				return $this->do_curl_post_json($endpoint, $data_string, $retry_count + 1);
+			else
+				return false;
 		} 
 		
 		ProxyDAO::countSuccess($this->db, $proxy['id']);
 		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'DO_CURL_POST_JSON', $log_seq++, 'COMPLETE', null, null);
 		
 		return $decoded;
-	}
+	}*/
 	
 	private static function get_transaction_time() {
 		return substr(str_replace('.', '', microtime(true)), 0, 13);
@@ -216,6 +214,8 @@ class WarOfNations {
 
 		[{"mac_address":"c8:aa:21:40:0a:2a","identifier_for_vendor":"8763af18eb4deace1840060a3bd9086b","app_uuid":"8763af18eb4deace1840060a3bd9086b","udid":"8763af18eb4deace1840060a3bd9086b"},{"android_version":"2.3.4","platform":"android","transaction_time":1410113097979,"session_id":"8509859","data_connection_type":"WiFi","client_static_table_data":{"active":"hc_20140829_38449","using":"hc_20140829_38449"},"device_type":"DROID3","seconds_from_gmt":-18000,"game_data_version":"hc_20140829_38449","client_build":"251","game_name":"HCGame","client_version":"1.8.4"},[{"service":"start.game","method":"load","_explicitType":"Command"}]]
 		*/
+		
+		// Initialize some stuff we need for the transaction
 		$endpoint = Constants::$authenticate;
 		$transaction_time = self::get_transaction_time();
 		$session_id = $this->generate_session_id();
@@ -223,6 +223,7 @@ class WarOfNations {
 		$log_seq = 0;
 		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'AUTHENTICATE', $log_seq++, 'START', null, null);
 		
+		// If we're not making a new device, then get the active device from our database
 		if(!$new) {
 			$device = DeviceDAO::getActiveDevice($this->db);
 			//print_r($device);
@@ -241,13 +242,13 @@ class WarOfNations {
 		$log_msg = "Device ID: {$this->device_id}\r\nMAC Address: {$this->mac_address}\r\nDevice Platform: {$this->device_platform}\r\nDevice Version: {$this->device_version}\r\nDevice Type: {$this->device_type}";
 		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'AUTHENTICATE', $log_seq++, 'DEVICE_INFO', "Device ID: {$this->device_id}", $log_msg);
 		
+		// Initalize temporary variables for our request from our active device
 		$device_id = $this->device_id;
 		$mac_address = $this->mac_address;
 		$device_platform = $this->device_platform;
 		$device_version = $this->device_version;
 		$device_type = $this->device_type;
 		$data_string = '[{"mac_address":"'.$mac_address.'","identifier_for_vendor":"'.$device_id.'","app_uuid":"'.$device_id.'","udid":"'.$device_id.'"},{"android_version":"'.$device_version.'","platform":"'.$device_platform.'","transaction_time":'.$transaction_time.',"session_id":"'.$session_id.'","data_connection_type":"WiFi","client_static_table_data":{"active":"'.Constants::$game_data_version.'","using":"'.Constants::$game_data_version.'"},"device_type":"'.$device_type.'","seconds_from_gmt":-18000,"game_data_version":"'.Constants::$game_data_version.'","client_build":"'.Constants::$client_build.'","game_name":"'.Constants::$game_name.'","client_version":"'.Constants::$client_version.'"},[{"service":"start.game","method":"load","_explicitType":"Command"}]]';
-		//$data_string = '[{"mac_address":"c8:aa:21:40:0a:2a","identifier_for_vendor":"8763af18eb4deace1840060a3bd9086b","app_uuid":"8763af18eb4deace1840060a3bd9086b","udid":"8763af18eb4deace1840060a3bd9086b"},{"android_version":"2.3.4","platform":"android","transaction_time":1410325698780,"session_id":"8317325","data_connection_type":"WiFi","client_static_table_data":{"active":"hc_20140908_38941","using":"hc_20140908_38941"},"device_type":"DROID3","seconds_from_gmt":-18000,"game_data_version":"hc_20140908_38941","client_build":"251","game_name":"HCGame","client_version":"1.8.4"},[{"service":"start.game","method":"load","_explicitType":"Command"}]]';
 		
 		if($this->debug_level >= 30) {
 			$data = json_decode($data_string);
@@ -259,7 +260,7 @@ class WarOfNations {
 		echo "Authenticating...<br/>\r\n";
 		
 		//echo $response;
-		$response = json_decode(self::do_curl_post_json($endpoint, $data_string), true);
+		$response = json_decode($this->ws->MakeRequest($endpoint, $data_string), true);
 		
 		echo "Done!<br/>\r\n";
 				
@@ -269,123 +270,6 @@ class WarOfNations {
 			echo '</pre>';
 		}
 		
-		/*
-		[metadata] => Array
-		        (
-		            [user] => Array
-		                (
-		                    [_explicitType] => user.User
-		                    [id] => 103228105
-		                    [iphone_udid] => 8763af18eb4deace1840060a3bd9086b
-		                    [mac_address] => c8:aa:21:40:0a:2a
-		                    [worlds] => Array
-		                        (
-		                            [101013] => 101013596288193
-		                            [101001] => 101001401287397
-		                        )
-
-		                    [active_player_id] => 101001401287397
-		                    [entry_source] => unknown
-		                    [country_code] => US
-		                    [time_created] => 2014-09-07 10:50:28
-		                    [version] => 5
-		                )
-
-		            [user_info] => Array
-		                (
-		                    [_explicitType] => user.UserInfo
-		                    [id] => 103228105
-		                    [time_created] => 2014-09-07 10:50:28
-		                    [time_updated] => 2014-09-07 12:45:34
-		                    [version] => 98
-		                    [hard_currency] => 500
-		                    [usd_spent] => 0
-		                    [is_tutorial_complete] => 1
-		                    [is_banned] => 0
-		                    [is_muted_from_chat] => 0
-		                    [has_kinvite_reward] => 0
-		                    [is_spender] => 0
-		                    [server_sequence_num] => 4
-		                    [ios_version] => 4.4.2
-		                    [ban_timestamp] => 0
-		                    [mute_timestamp] => 0
-		                    [lifetime_currency_gained] => 500
-		                    [lifetime_currency_spent] => 0
-		                    [locale] => en-US
-		                )
-
-		            [server_time] => 1410119134
-		            [player] => Array
-		                (
-		                    [_explicitType] => player.Player
-		                    [player_name] => Player401287397
-		                    [user_id] => 103228105
-		                    [world_id] => 101001
-		                    [is_spender] => 0
-		                    [experience] => 23
-		                    [level] => 2
-		                    [ab_test] => []
-		                    [is_test_account] => 0
-		                    [did_player_level_up] => 0
-		                    [last_game_load_time] => 2014-09-07 12:45:34
-		                    [resources] => Array
-		                        (
-		                            [1] => 20000
-		                            [2] => 20000
-		                            [3] => 0
-		                            [4] => 0
-		                            [5] => 20000
-		                            [6] => 19839.038888889
-		                        )
-
-		                    [is_npc] => 0
-		                    [net_food_rate] => -140
-		                    [unit_starvation_delta] => 510146
-		                    [next_starvation_time] => 2014-09-13 10:28:00
-		                    [food_update_time] => 2014-09-07 12:45:34
-		                    [guild_id] => 
-		                    [stats_number_of_towns] => 1
-		                    [stats_total_unit_value_killed] => 0
-		                    [immunity_end_time] => 2014-09-12 11:36:34
-		                    [immunity_type] => 1
-		                    [id] => 101001401287397
-		                    [player_id] => 101001401287397
-		                    [version] => 9
-		                )
-		
-		
-		[session] => Array
-		        (
-		            [_explicitType] => Session
-		            [iphone_udid] => 8763af18eb4deace1840060a3bd9086b
-		            [session_id] => 8765432
-		            [api_version] => 1
-		            [client_version] => 1.8.4
-		            [client_build] => 251
-		            [device_type] => SCH-I545
-		            [game_name] => HCGame
-		            [seconds_from_gmt] => -18000
-		            [mac_address] => 48:16:7b:c2:34:0
-		            [game_data_version] => hc_20140903_38604
-		            [platform] => android
-		            [player_id] => 101001401287397
-		            [time_created] => 2014-09-07 11:37:48
-		            [time_updated] => 2014-09-07 11:37:48
-		            [version] => 0
-		            [transaction_time] => 1410119134122
-		            [start_sequence_num] => 1
-		            [wd_player_id] => 0
-		            [locale] => en-US
-		            [end_sequence_num] => 1
-		            [req_id] => 1
-		            [language] => en
-		            [client_ip] => 73.185.135.139
-		            [country_code] => US
-		            [guild_id] => 
-		            [data_connection_type] => WiFi
-		        )
-		*/
-		
 		// Save the player ID and Session ID
 		$this->player_id = $response['metadata']['user']['active_player_id'];
 		$this->session_id = $response['session']['session_id'];
@@ -393,6 +277,7 @@ class WarOfNations {
 		$log_msg = "Player ID: {$this->player_id}, Session ID: {$this->session_id}";
 		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'AUTHENTICATE', $log_seq++, 'RESPONSE', $log_msg, print_r($response, true));
 		
+		// If this was a new device, then save it
 		if($new) {
 			$device = new Device();
 			$device->device_uuid = $device_id;
@@ -400,7 +285,9 @@ class WarOfNations {
 			$device->platform = $device_platform;
 			$device->version = $device_version;
 			$device->device_type = $device_type;
-
+			
+			DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'AUTHENTICATE', $log_seq++, 'CREATING_NEW_DEVICE', null, var_dump($device));
+			
 			DeviceDAO::insertDevice($this->db, $device);
 		}
 		
@@ -495,6 +382,10 @@ class WarOfNations {
 
 		[{"transaction_time":"1409886446625","platform":"android","session_id":"2913291","start_sequence_num":1,"iphone_udid":"66d2ea9883993b46e9f06fba6e652302","wd_player_id":0,"locale":"en-US","_explicitType":"Session","client_build":"251","game_name":"HCGame","api_version":"1","mac_address":"40:0E:85:0D:77:29","end_sequence_num":1,"req_id":1,"player_id":101013866213677,"language":"en","game_data_version":"hc_20140903_38604","client_version":"1.8.4"},[{"service":"world.world","method":"get_map_data","_explicitType":"Command","params":[[[-1250,0,50,50]]]}]]
 		*/
+		
+		$log_seq = 0;
+		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'GET_WORLD_MAP', $log_seq++, 'START', "World: {$this->world_id}, X: $x_start, Y: $y_start, X_RANGE: $x_range, Y_RANGE: $y_range", null);
+		
 		$endpoint = Constants::$call;
 		$transaction_time = self::get_transaction_time();
 		$session_id = $this->session_id;
@@ -507,13 +398,17 @@ class WarOfNations {
 		$x_start = self::convertFromMapCoordinate($x_start, $y_start);
 		$data_string = '[{"transaction_time":"'.$transaction_time.'","platform":"'.$device_platform.'","session_id":"'.$session_id.'","start_sequence_num":1,"iphone_udid":"'.$device_id.'","wd_player_id":0,"locale":"en-US","_explicitType":"Session","client_build":"'.Constants::$client_build.'","game_name":"'.Constants::$game_name.'","api_version":"'.Constants::$api_version.'","mac_address":"'.$mac_address.'","end_sequence_num":1,"req_id":1,"player_id":'.$player_id.',"language":"en","game_data_version":"'.Constants::$game_data_version.'","client_version":"'.Constants::$client_version.'"},[{"service":"world.world","method":"get_map_data","_explicitType":"Command","params":[[['.$x_start.','.$y_start.','.$x_range.','.$y_range.']]]}]]';
 		
+		
+		
 		echo "Getting World Map...<br/>\r\n";
 		while(true) {
-			$result_string = self::do_curl_post_json($endpoint, $data_string);
+			$result_string = $this->ws->MakeRequest($endpoint, $data_string);
 			if(!$result_string) return false;
 		
 			$result = json_decode($result_string, true);
 			if($result == null) {
+				DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'GET_WORLD_MAP', $log_seq++, 'JSON_DECODE_FAILED', null, $result_string, 1);
+				
 				echo "Error: Failed to decode JSON string: $result_string<br/>\r\n";
 				continue;
 			}
@@ -528,12 +423,19 @@ class WarOfNations {
 			echo '</pre>';
 		}
 		
+		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'GET_WORLD_MAP', $log_seq++, 'RESPONSE', null, print_r($result, true));
+		
 		$this->ParseAndSaveWorldMap($result);
+		
+		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'GET_WORLD_MAP', $log_seq++, 'COMPLETE', null, null);
 		
 		return true;
 	}
 	
 	public function ParseAndSaveWorldMap($world_response) {
+		$log_seq = 0;
+		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'PARSE_SAVE_WORLD_MAP', $log_seq++, 'START', null, null);
+		
 		// Get the Hexes section of the world response
 		$world = $world_response['responses'][0]['return_value']['hexes'];
 		
@@ -609,6 +511,8 @@ class WarOfNations {
 						if($this->db->hasError()) {
 							echo 'Error inserting Guild: ';
 							print_r($this->db->getError());
+							$log_msg = var_export($guild, true)."\r\n\r\n".print_r($this->db->getError(), true);
+							DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'PARSE_SAVE_WORLD_MAP', $log_seq++, 'ERROR_INSERTING_GUILD', "World: {$guild->world_id}, Guild: {$guild->guild_name}", $log_msg, 1);
 							echo "<br/>\r\n";
 						}
 					}
@@ -626,6 +530,9 @@ class WarOfNations {
 						echo 'Error inserting Player: ';
 						print_r($this->db->getError());
 						echo "<br/>\r\n";
+						
+						$log_msg = var_export($player, true)."\r\n\r\n".print_r($this->db->getError(), true);
+						DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'PARSE_SAVE_WORLD_MAP', $log_seq++, 'ERROR_INSERTING_PLAYER', "World: {$player->world_id}, Player: {$player->player_name}", $log_msg, 1);	
 					}
 				}
 			} else if ($player->player_name){
@@ -634,6 +541,9 @@ class WarOfNations {
 					echo 'Error updating Player: ';
 					print_r($this->db->getError());
 					echo "<br/>\r\n";
+					
+					$log_msg = var_export($player, true)."\r\n\r\n".print_r($this->db->getError(), true);
+					DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'PARSE_SAVE_WORLD_MAP', $log_seq++, 'ERROR_UPDATING_PLAYER', "World: {$player->world_id}, Player: {$player->player_name}", $log_msg, 1);
 				}
 			}
 			
@@ -648,6 +558,10 @@ class WarOfNations {
 					echo 'Error inserting Hex: ';
 					print_r($this->db->getError());
 					echo "<br/>\r\n";
+					
+					$log_msg = var_export($hex, true)."\r\n\r\n".print_r($this->db->getError(), true);
+					DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'PARSE_SAVE_WORLD_MAP', $log_seq++, 'ERROR_INSERTING_HEX', "World: {$hex->world_id}, X: {$hex->hex_x}, Y: {$hex->hex_y}", $log_msg, 1);
+					
 				}
 			} else {
 				$hex_id = WorldMapDAO::updateHex($this->db, $hex);
@@ -655,12 +569,14 @@ class WarOfNations {
 					echo 'Error updating Hex: ';
 					print_r($this->db->getError());
 					echo "<br/>\r\n";
+					
+					$log_msg = var_export($hex, true)."\r\n\r\n".print_r($this->db->getError(), true);
+					DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'PARSE_SAVE_WORLD_MAP', $log_seq++, 'ERROR_UPDATING_HEX', "World: {$hex->world_id}, X: {$hex->hex_x}, Y: {$hex->hex_y}", $log_msg, 1);
 				}
 			}
-			
-
 		}
 		
+		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'PARSE_SAVE_WORLD_MAP', $log_seq++, 'COMPLETE', "Created $hex_count Hexes", null);
 		echo "Created $hex_count Hexes<br/>\r\n";
 	}
 	
@@ -685,6 +601,9 @@ class WarOfNations {
 		[{"transaction_time":"1410411615022","platform":"android","session_id":"9278399","start_sequence_num":1,"iphone_udid":"b0b01655f403347cea151d87a45d2746","wd_player_id":0,"locale":"en-US","_explicitType":"Session","client_build":"251","game_name":"HCGame","api_version":"1","mac_address":"48:16:7b:c2:34:0","end_sequence_num":1,"req_id":1,"player_id":101013849913487,"language":"en","game_data_version":"hc_20140908_38941","client_version":"1.8.4"},[{"service":"leaderboard.leaderboard","method":"get_leaderboard_info","_explicitType":"Command","params":[1,,null]}]]
 		*/
 		
+		$log_seq = 0;
+		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'GET_LEADERBOARD', $log_seq++, 'START', "Board ID: $leaderboard_id, Start Index: $start_index", null);
+		
 		$endpoint = Constants::$call;
 		$transaction_time = self::get_transaction_time();
 		$session_id = $this->session_id;
@@ -697,7 +616,7 @@ class WarOfNations {
 		$data_string = '[{"transaction_time":"'.$transaction_time.'","platform":"'.$device_platform.'","session_id":"'.$session_id.'","start_sequence_num":1,"iphone_udid":"'.$device_id.'","wd_player_id":0,"locale":"en-US","_explicitType":"Session","client_build":"'.Constants::$client_build.'","game_name":"'.Constants::$game_name.'","api_version":"'.Constants::$api_version.'","mac_address":"'.$mac_address.'","end_sequence_num":1,"req_id":1,"player_id":'.$player_id.',"language":"en","game_data_version":"'.Constants::$game_data_version.'","client_version":"'.Constants::$client_version.'"},[{"service":"leaderboard.leaderboard","method":"get_leaderboard_info","_explicitType":"Command","params":['.$leaderboard_id.','.$start_index.',null]}]]';
 		
 		echo "Getting Leaderboards...<br/>\r\n";
-		$result_string = self::do_curl_post_json($endpoint, $data_string);
+		$result_string = $this->ws->MakeRequest($endpoint, $data_string);
 		$result = json_decode($result_string, true);
 		echo "Done!<br/>\r\n";
 		
@@ -707,15 +626,22 @@ class WarOfNations {
 			echo '</pre>';
 		}
 		
+		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'GET_LEADERBOARD', $log_seq++, 'RESPONSE', null, print_r($result, true));
+		
 		$leaderboard = $result['responses'][0]['return_value']['leaderboard_info']['leaderboard'];
 		
 		if($leaderboard_id == 1)
 			$this->SavePlayerLeaderboard($leaderboard);
 		else if($leaderboard_id == 2)
 			$this->SaveGuildLeaderboard($leaderboard);
+			
+		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'GET_LEADERBOARD', $log_seq++, 'COMPLETE', null, null);
 	}
 	
 	function SavePlayerLeaderboard($leader_data) {
+		$log_seq = 0;
+		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'SAVE_PLAYER_LEADERBOARD', $log_seq++, 'START', null, null);
+		
 		foreach($leader_data as $key => $leader) {
 			$player = new Player();
 			$player->world_id = $this->world_id;
@@ -737,11 +663,23 @@ class WarOfNations {
 				echo 'Error saving player: ';
 				print_r($this->db->getError());
 				echo "<br/>\r\n";
+				
+				$log_msg = var_dump($player)."\r\n\r\n".print_r($this->db->getError(), true);
+				DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'SAVE_PLAYER_LEADERBOARD', $log_seq++, 'ERROR_SAVING_PLAYER', "World: {$player->world_id}, Player: {$player->player_name}", $log_msg, 1);
+			} else {
+				$count++;
 			}
 		}
+		
+		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'SAVE_PLAYER_LEADERBOARD', $log_seq++, 'COMPLETE', "Saved $count Players", null);
+		
 	}
 		
 	function SaveGuildLeaderboard($leader_data) {
+		$log_seq = 0;
+		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'SAVE_GUILD_LEADERBOARD', $log_seq++, 'START', null, null);
+		
+		$count = 0;
 		foreach($leader_data as $key => $leader) {
 			$guild = new Guild();
 			$guild->world_id = $this->world_id;
@@ -764,8 +702,16 @@ class WarOfNations {
 				echo 'Error saving guild: ';
 				print_r($this->db->getError());
 				echo "<br/>\r\n";
+				
+				$log_msg = var_dump($player)."\r\n\r\n".print_r($this->db->getError(), true);
+				DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'SAVE_GUILD_LEADERBOARD', $log_seq++, 'ERROR_SAVING_GUILD', "World: {$player->world_id}, Guild: {$guild->guild_name}", $log_msg, 1);
+			} else {
+				$count++;
 			}
 		}
+		
+		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'SAVE_GUILD_LEADERBOARD', $log_seq++, 'COMPLETE', "Saved $count Guilds", null);
+		
 	}
 }
 

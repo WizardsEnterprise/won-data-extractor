@@ -1,5 +1,6 @@
 <?php
 require_once('MapperBase.class.php');
+require_once('ModelBase.class.php');
 
 class DeviceDAO {
 	public static function getAllDevices($db) {
@@ -52,37 +53,13 @@ class DeviceMapper {
 	}
 }
 
-class Device {
+class Device extends ModelBase{
 	public $id;
 	public $device_uuid;
 	public $mac_address;
 	public $platform;
 	public $version;
 	public $device_type;
-	
-	public static function FromJson($json) {
-		global $debug;
-		
-		if($debug) {
-			echo 'Guild::FromJson'.PHP_EOL;
-			echo 'JSON Array:'.PHP_EOL;
-			print_r($json);
-		}
-		$obj = new Device();
-		
-		foreach ($json as $key => $value)
-		{	
-			if(property_exists($obj, $key)) {
-				$obj->$key = $value;
-			}
-		}
-		
-		if($debug) {
-			echo 'Guild Object:'.PHP_EOL;
-			var_dump($obj);
-		}
-		
-		return $obj;
-	}
+	public $mapper = 'DeviceMapper';
 }
 ?>

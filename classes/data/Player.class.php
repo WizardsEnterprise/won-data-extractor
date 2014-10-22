@@ -1,5 +1,6 @@
 <?php
 require_once('MapperBase.class.php');
+require_once('ModelBase.class.php');
 
 class PlayerDAO {
 	public static function getAllPlayers($db) {
@@ -7,7 +8,7 @@ class PlayerDAO {
 	}
 	
 	public static function getPlayerById($db, $player_id) {
-		return $db->select("SELECT * FROM players WHERE id=?", array($game_id));
+		return $db->selectOne("SELECT * FROM players WHERE id=?", array($player_id));
 	}
 	
 	public static function getLocalIdFromGameId($db, $game_id) {
@@ -45,9 +46,18 @@ class PlayerDAO {
 			echo 'PlayerDAO::updatePlayer'.PHP_EOL;
 		}
 		
-		//$existing_player = self::getPlayerById($db, $Player->id);
-		//self::insertPlayer($db, $existing_player, true);
+		// Write the existing player data to the player_hist table for safe keepings
+		$existing_player = Player::FromDB(self::getPlayerById($db, $Player->id));
 		
+		// If there is no meaningful difference in this player, don't update the record
+		if(!self::playerHasMeaningfulDifference($existing_player, $Player, $customExcludes)) {
+			echo "player {$Player->player_name} has no changes \r\n";
+			return true;
+		}
+			
+		self::insertPlayer($db, $existing_player, true);
+		
+		/* Update the existing record with the newly acquired information */
 		$updateStr = '`'.implode('`=?, `', PlayerMapper::ColumnNames('Update', $customExcludes)).'`=?';
 		$paramValues = PlayerMapper::GetParamValues($Player, 'Update', $customExcludes);
 		$params = rtrim(str_repeat('?, ', count($paramValues)), ', ');
@@ -63,13 +73,32 @@ class PlayerDAO {
 		
 		return $db->Update($sql, $paramValues);
 	}
+	
+	public static function playerHasMeaningfulDifference($p1, $p2, $customExcludes = array()) {
+		if(!in_array('player_name', $customExcludes) && $p1->player_name != $p2->player_name)
+			return true;
+		
+		if(!in_array('battle_points', $customExcludes) && $p1->battle_points != $p2->battle_points)
+			return true;
+			
+		if(!in_array('guild_id', $customExcludes) && $p1->guild_id != $p2->guild_id)
+			return true;
+		
+		if(!in_array('level', $customExcludes) && $p1->level != $p2->level)
+			return true;
+		
+		if(!in_array('bases', $customExcludes) && $p1->bases != $p2->bases)
+			return true;
+			
+		return false;
+	}
 }
 
-class PlayerMapper extends MapperBase {
+class PlayerMapper {
 	public static $mapping = array('id' => 'id', 'world_id' => 'world_id', 'game_player_id' => 'game_player_id',
 								   'player_name' => 'player_name', 'level' => 'level', 'battle_points' => 'battle_points', 
 								   'bases' => 'bases', 'guild_id' => 'guild_id', 'data_load_id' => 'data_load_id');
-	
+								
 	public static $excludeFromInsert = array('id');
 	public static $excludeFromUpdate = array('id', 'world_id', 'game_player_id');
 	
@@ -84,7 +113,7 @@ class PlayerMapper extends MapperBase {
 	}
 }
 
-class Player {
+class Player extends ModelBase {
 	public $id;
 	public $world_id;
 	public $game_player_id;
@@ -94,58 +123,6 @@ class Player {
 	public $bases;
 	public $guild_id;
 	public $data_load_id;
-	
-	public static function FromJson($json) {
-		global $debug;
-		
-		if($debug) {
-			echo 'Player::FromJson'.PHP_EOL;
-			echo 'JSON Array:'.PHP_EOL;
-			print_r($json);
-		}
-		$obj = new Player();
-		
-		foreach ($json as $key => $value)
-		{	
-			if(property_exists($obj, $key)) {
-				$obj->$key = $value;
-			}
-		}
-		
-		if($debug) {
-			echo 'Player Object:'.PHP_EOL;
-			var_dump($obj);
-		}
-		
-		return $obj;
-	}
-	
-	public static function FromDB($player) {
-		global $debug;
-		
-		if($debug) {
-			echo 'Player::FromDB'.PHP_EOL;
-			echo 'DB Array:'.PHP_EOL;
-			print_r($player);
-		}
-		$obj = new Player();
-		
-		foreach ($player as $key => $value)
-		{	
-			if($obj_key = array_search($value, PlayerMapper::$mapping))
-			{
-				if(property_exists($obj, $obj_key)) {
-					$obj->$obj_key = $value;
-				}
-			}
-		}
-		
-		if($debug) {
-			echo 'Player Object:'.PHP_EOL;
-			var_dump($obj);
-		}
-		
-		return $obj;
-	}
+	public $mapper = 'PlayerMapper';
 }
 ?>

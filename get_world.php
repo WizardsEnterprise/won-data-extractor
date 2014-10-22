@@ -16,7 +16,7 @@ require_once('classes/data/DataLoad.class.php');
 
 $won = new WarOfNations(0);
 
-$won->data_load_id = DataLoadDAO::initNewLoad($won->db, 'WORLD_MAP');
+$won->setDataLoadId(DataLoadDAO::initNewLoad($won->db, 'WORLD_MAP'));
 DataLoadDAO::startLoad($won->db, $won->data_load_id);
 
 //$won->CreateNewPlayer();

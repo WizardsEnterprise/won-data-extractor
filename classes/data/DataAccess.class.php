@@ -112,6 +112,10 @@ class DataAccess {
 		
 		return $retVal;
 	}
+	
+	function SelectOne($query, $params = array()) {
+		return $this->Select($query, $params)[0];
+	}
 }
 
 ?>
