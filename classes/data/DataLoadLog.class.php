@@ -10,7 +10,7 @@ class DataLoadLogDAO {
 		if($db->hasError()) {
 			echo 'Error inserting log: ';
 			print_r($db->getError());
-			echo "<br/>\r\n";
+			echo "\r\n";
 		}
 		return $id;
 	}

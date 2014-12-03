@@ -28,6 +28,9 @@ class DataAccess {
 	}
 	
 	private function PrepareAndExecuteQuery($query, $params) {
+		$this->errno = false;
+		$this->errorMsg = false;
+		
 		try {
 			$stmt = $this->conn->prepare($query);
 		} catch (PDOException $e) {

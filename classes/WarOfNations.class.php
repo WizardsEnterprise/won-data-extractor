@@ -65,121 +65,6 @@ class WarOfNations {
 		$this->ws->data_load_id = $dlid;
 	}
 	
-	/*private function do_curl_post_json($endpoint, $data_string, $retry_count = 0) {	
-		$log_msg = "Attempt #$retry_count\r\n\r\n".$data_string;
-		$log_seq = 0;
-		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'DO_CURL_POST_JSON', $log_seq++, 'START', $endpoint, $log_msg);
-		$max_retries = -1;
-			
-		if($retry_count > 0)
-			echo "Retry Attempt #$retry_count<br/>\r\n";
-		$url = Constants::$url_base.$endpoint;
-		
-		if($this->debug_level >= 30) {
-			echo 'Curling URL: '.$url."<br/>\r\n";
-			echo 'Curling Data: '.$data_string."<br/>\r\n";
-		}
-		
-		$time = substr(microtime(true), 0, 10);
-		$hmac_secret = $time.$endpoint.$data_string;
-		$headers = array(
-		  	'Accept: application/json',
-			'Content-type: application/json; charset=UTF-8;',
-			'X-Signature: ' . hash_hmac('md5', $hmac_secret, Constants::$hmac_key, false),
-			'X-Timestamp: ' . $time,
-			'User-Agent: Dalvik/1.6.0 (Linux; U; Android 4.4.2; SCH-I545 Build/KOT49H)',
-			'Connection: Keep-Alive',
-			'Accept-Encoding: gzip'
-		);
-				
-		if($this->debug_level >= 30) {
-			echo '<pre>';
-			print_r($headers);
-			echo '</pre>';
-		}
-		
-		$proxy = $this->proxies[array_rand($this->proxies)];
-		$proxy_str = "{$proxy['ip_address']}:{$proxy['port']}";
-		$ch = curl_init($url);         
-		curl_setopt($ch, CURLOPT_PROXY, $proxy_str);
-		if($proxy['type'] == 'SOCKS')
-			curl_setopt($ch, CURLOPT_PROXYTYPE, CURLPROXY_SOCKS5);                                                       
-		curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "POST");                                                                     
-		curl_setopt($ch, CURLOPT_POSTFIELDS, $data_string);                                                                  
-		curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);                                                             
-		curl_setopt($ch, CURLOPT_HTTPHEADER, $headers); 
-		curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5); 
-		curl_setopt($ch, CURLOPT_TIMEOUT, 10); //timeout in seconds  
-		
-		$log_msg = "Proxy: $proxy_str\r\n\r\n".print_r($headers, true);
-		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'DO_CURL_POST_JSON', $log_seq++, 'REQUEST_INFO', null, $log_msg);
-		
-		$start = microtime(true);
-		$response_string = curl_exec($ch);
-		$end = microtime(true);
-		
-		// cleans up the curl set
-		curl_close($ch);
-		
-		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'DO_CURL_POST_JSON', $log_seq++, 'REQUEST_COMPLETE', 'Time: '.($end - $start), null);
-		
-		echo "Curl completed in ".($end - $start)." seconds<br/>\r\n";
-		
-		if(!$response_string) {
-			$log_msg = "Proxy: $proxy_str<br/>\r\nURL: $url<br/>\r\nData: $data_string<br/>\r\n";
-			DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'DO_CURL_POST_JSON', $log_seq++, 'ERROR_CURL_RESPONSE', 'Error occurred during curl request', $log_msg, 1);
-			
-			echo "Error occurred while getting Curl response.  Request: <br/>\r\n";
-			echo "Proxy: $proxy_str<br/>\r\n";
-			echo "URL: $url<br/>\r\n";
-			echo "Data: $data_string<br/>\r\n";
-			
-			ProxyDAO::countFailure($this->db, $proxy['id']);
-			if($retry_count < $max_retries || $max_retries < 0)
-				return $this->do_curl_post_json($endpoint, $data_string, $retry_count + 1);
-			else
-				return false;
-		}
-		
-		$decoded = gzdecode($response_string);
-		
-		// If we encountered an error in decoding, see what we can do with it
-		if(!$decoded) {
-			if(mb_check_encoding($response_string, 'UTF-8')) {
-				DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'DO_CURL_POST_JSON', $log_seq++, 'GZDECODE_QUESTIONABLE', 'Gzip decoding failed, but response is utf8 encoded.  We\'ll try to use it.', $response_string);
-				
-				echo "Error occurred while decoding CURL response, but let's assume this is OK! <br/>\r\n";
-				
-				// If we think we got a proxy error, then log it, otherwise return the response 
-				if(stripos($response_string, 'The maximum web proxy user limit has been reached') > 0) {
-					DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'DO_CURL_POST_JSON', $log_seq++, 'PROXY_LIMIT_REACHED', null, null);
-					ProxyDAO::disableProxy($this->db, $proxy['id'], 'The maximum web proxy user limit has been reached');
-				} else if(stripos($response_string, '<title>Access Den') > 0) {
-					DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'DO_CURL_POST_JSON', $log_seq++, 'ACCESS_DENIED', null, null);
-					ProxyDAO::disableProxy($this->db, $proxy['id'], 'Access Denied Received');
-				} else {
-					ProxyDAO::countSuccess($this->db, $proxy['id']);
-					return $response_string;
-				}
-			} else {
-				DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'DO_CURL_POST_JSON', $log_seq++, 'GZDECODE_FAILED', 'Gzip decoding failed, and we don\'t know what to do with it.  Retry this request.', $response_string, 1);
-				
-				echo "Error occurred while decoding CURL response, and we think this is a problem! <br/>\r\n";
-				ProxyDAO::countFailure($this->db, $proxy['id']);
-			}
-			
-			// If we made it this far then we need to retry 
-			if($retry_count < $max_retries || $max_retries < 0)
-				return $this->do_curl_post_json($endpoint, $data_string, $retry_count + 1);
-			else
-				return false;
-		} 
-		
-		ProxyDAO::countSuccess($this->db, $proxy['id']);
-		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'DO_CURL_POST_JSON', $log_seq++, 'COMPLETE', null, null);
-		
-		return $decoded;
-	}*/
 	
 	private static function get_transaction_time() {
 		return substr(str_replace('.', '', microtime(true)), 0, 13);
@@ -257,12 +142,12 @@ class WarOfNations {
 			echo "</pre>";
 		}
 		
-		echo "Authenticating...<br/>\r\n";
+		echo "Authenticating...\r\n";
 		
 		//echo $response;
 		$response = json_decode($this->ws->MakeRequest($endpoint, $data_string), true);
 		
-		echo "Done!<br/>\r\n";
+		echo "Done!\r\n";
 				
 		if($this->debug_level >= 30) {
 			echo '<pre>';
@@ -326,9 +211,9 @@ class WarOfNations {
 		$device_type = $this->device_type;
 		$data_string = '[{"transaction_time":"'.$transaction_time.'","platform":"'.$device_platform.'","session_id":"'.$session_id.'","start_sequence_num":3,"iphone_udid":"'.$device_id.'","wd_player_id":0,"locale":"en-US","_explicitType":"Session","client_build":"'.Constants::$client_build.'","game_name":"'.Constants::$game_name.'","api_version":"'.Constants::$api_version.'","mac_address":"'.$mac_address.'","end_sequence_num":3,"req_id":1,"player_id":'.$tut_player_id.',"language":"en","game_data_version":"'.Constants::$game_data_version.'","client_version":"'.Constants::$client_version.'"},[{"service":"profile.profile","method":"finish_tutorial","_explicitType":"Command","params":[]}]]';
 		
-		echo "Finishing Tutorial...<br/>\r\n";
+		echo "Finishing Tutorial...\r\n";
 		$result = json_decode(self::do_curl_post_json($endpoint, $data_string), true);
-		echo "Done!<br/>\r\n";
+		echo "Done!\r\n";
 		
 		if($this->debug_level >= 30) {
 			echo '<pre>';
@@ -347,13 +232,13 @@ class WarOfNations {
 	// In order to initialize a player into the world, you need to authenticate as a new device
 	// and then tell the game that you've completed the tutorial.
 	public function CreateNewPlayer() {
-		echo "Authenticating as New Device...<br/>\r\n";
+		echo "Authenticating as New Device...\r\n";
 		$this->Authenticate(true);
-		echo "Done!<br/>\r\n";	
+		echo "Done!\r\n";	
 		
-		echo "Finishing Tutorial...<br/>\r\n";
+		echo "Finishing Tutorial...\r\n";
 		$this->FinishTutorial();
-		echo "Done!<br/>\r\n";
+		echo "Done!\r\n";
 		
 		// TODO: Save information to database
 	}
@@ -400,7 +285,7 @@ class WarOfNations {
 		
 		
 		
-		echo "Getting World Map...<br/>\r\n";
+		echo "Getting World Map...\r\n";
 		while(true) {
 			$result_string = $this->ws->MakeRequest($endpoint, $data_string);
 			if(!$result_string) return false;
@@ -409,12 +294,12 @@ class WarOfNations {
 			if($result == null) {
 				DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'GET_WORLD_MAP', $log_seq++, 'JSON_DECODE_FAILED', null, $result_string, 1);
 				
-				echo "Error: Failed to decode JSON string: $result_string<br/>\r\n";
+				echo "Error: Failed to decode JSON string: $result_string\r\n";
 				continue;
 			}
 			break;
 		}
-		echo "Done!<br/>\r\n";
+		echo "Done!\r\n";
 		
 		//echo $result_string;
 		if($this->debug_level >= 30) {
@@ -485,7 +370,7 @@ class WarOfNations {
 			$player->game_player_id = $game_player_id;
 			
 			// If this is a town tile then we have additional information, so let's process it
-			if(isset($hex->town_name)) {
+			if(isset($hex->town_name) || in_array($hex->building_id, array(14))) {
 				// Set the player's name and level
 				$player->player_name = $hex->player_name;
 				$player->level = $hex->player_level;
@@ -513,7 +398,7 @@ class WarOfNations {
 							print_r($this->db->getError());
 							$log_msg = var_export($guild, true)."\r\n\r\n".print_r($this->db->getError(), true);
 							DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'PARSE_SAVE_WORLD_MAP', $log_seq++, 'ERROR_INSERTING_GUILD', "World: {$guild->world_id}, Guild: {$guild->guild_name}", $log_msg, 1);
-							echo "<br/>\r\n";
+							echo "\r\n";
 						}
 					}
 					// Set the player's guild
@@ -521,15 +406,18 @@ class WarOfNations {
 				}
 			}
 			
+			/*if($game_player_id == '101013592272409')
+				var_dump($player);*/
+			
 			// If this player didn't already exist in our database, create it.  Otherwise, update it.
 			if(!$player_id) {
 				if($game_player_id) {
 					$player_id = PlayerDAO::insertPlayer($this->db, $player);
-				
+					
 					if($this->db->hasError()) {
 						echo 'Error inserting Player: ';
 						print_r($this->db->getError());
-						echo "<br/>\r\n";
+						echo "\r\n";
 						
 						$log_msg = var_export($player, true)."\r\n\r\n".print_r($this->db->getError(), true);
 						DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'PARSE_SAVE_WORLD_MAP', $log_seq++, 'ERROR_INSERTING_PLAYER', "World: {$player->world_id}, Player: {$player->player_name}", $log_msg, 1);	
@@ -540,7 +428,7 @@ class WarOfNations {
 				if($this->db->hasError()) {
 					echo 'Error updating Player: ';
 					print_r($this->db->getError());
-					echo "<br/>\r\n";
+					echo "\r\n";
 					
 					$log_msg = var_export($player, true)."\r\n\r\n".print_r($this->db->getError(), true);
 					DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'PARSE_SAVE_WORLD_MAP', $log_seq++, 'ERROR_UPDATING_PLAYER', "World: {$player->world_id}, Player: {$player->player_name}", $log_msg, 1);
@@ -557,7 +445,7 @@ class WarOfNations {
 				if($this->db->hasError()) {
 					echo 'Error inserting Hex: ';
 					print_r($this->db->getError());
-					echo "<br/>\r\n";
+					echo "\r\n";
 					
 					$log_msg = var_export($hex, true)."\r\n\r\n".print_r($this->db->getError(), true);
 					DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'PARSE_SAVE_WORLD_MAP', $log_seq++, 'ERROR_INSERTING_HEX', "World: {$hex->world_id}, X: {$hex->hex_x}, Y: {$hex->hex_y}", $log_msg, 1);
@@ -568,7 +456,7 @@ class WarOfNations {
 				if($this->db->hasError()) {
 					echo 'Error updating Hex: ';
 					print_r($this->db->getError());
-					echo "<br/>\r\n";
+					echo "\r\n";
 					
 					$log_msg = var_export($hex, true)."\r\n\r\n".print_r($this->db->getError(), true);
 					DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'PARSE_SAVE_WORLD_MAP', $log_seq++, 'ERROR_UPDATING_HEX', "World: {$hex->world_id}, X: {$hex->hex_x}, Y: {$hex->hex_y}", $log_msg, 1);
@@ -577,7 +465,7 @@ class WarOfNations {
 		}
 		
 		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'PARSE_SAVE_WORLD_MAP', $log_seq++, 'COMPLETE', "Created $hex_count Hexes", null);
-		echo "Created $hex_count Hexes<br/>\r\n";
+		echo "Created $hex_count Hexes\r\n";
 	}
 	
 	// Get the leaderboard and save the information found
@@ -615,10 +503,10 @@ class WarOfNations {
 		$device_type = $this->device_type;
 		$data_string = '[{"transaction_time":"'.$transaction_time.'","platform":"'.$device_platform.'","session_id":"'.$session_id.'","start_sequence_num":1,"iphone_udid":"'.$device_id.'","wd_player_id":0,"locale":"en-US","_explicitType":"Session","client_build":"'.Constants::$client_build.'","game_name":"'.Constants::$game_name.'","api_version":"'.Constants::$api_version.'","mac_address":"'.$mac_address.'","end_sequence_num":1,"req_id":1,"player_id":'.$player_id.',"language":"en","game_data_version":"'.Constants::$game_data_version.'","client_version":"'.Constants::$client_version.'"},[{"service":"leaderboard.leaderboard","method":"get_leaderboard_info","_explicitType":"Command","params":['.$leaderboard_id.','.$start_index.',null]}]]';
 		
-		echo "Getting Leaderboards...<br/>\r\n";
+		echo "Getting Leaderboards...\r\n";
 		$result_string = $this->ws->MakeRequest($endpoint, $data_string);
 		$result = json_decode($result_string, true);
-		echo "Done!<br/>\r\n";
+		echo "Done!\r\n";
 		
 		if($this->debug_level >= 30) {
 			echo '<pre>';
@@ -662,7 +550,7 @@ class WarOfNations {
 			if($this->db->hasError()) {
 				echo 'Error saving player: ';
 				print_r($this->db->getError());
-				echo "<br/>\r\n";
+				echo "\r\n";
 				
 				$log_msg = var_dump($player)."\r\n\r\n".print_r($this->db->getError(), true);
 				DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'SAVE_PLAYER_LEADERBOARD', $log_seq++, 'ERROR_SAVING_PLAYER', "World: {$player->world_id}, Player: {$player->player_name}", $log_msg, 1);
@@ -701,7 +589,7 @@ class WarOfNations {
 			if($this->db->hasError()) {
 				echo 'Error saving guild: ';
 				print_r($this->db->getError());
-				echo "<br/>\r\n";
+				echo "\r\n";
 				
 				$log_msg = var_dump($player)."\r\n\r\n".print_r($this->db->getError(), true);
 				DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'SAVE_GUILD_LEADERBOARD', $log_seq++, 'ERROR_SAVING_GUILD', "World: {$player->world_id}, Guild: {$guild->guild_name}", $log_msg, 1);

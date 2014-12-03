@@ -51,7 +51,7 @@ class PlayerDAO {
 		
 		// If there is no meaningful difference in this player, don't update the record
 		if(!self::playerHasMeaningfulDifference($existing_player, $Player, $customExcludes)) {
-			echo "player {$Player->player_name} has no changes \r\n";
+			//echo "player {$Player->player_name} has no changes \r\n";
 			return true;
 		}
 			

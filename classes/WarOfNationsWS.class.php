@@ -19,7 +19,7 @@ class WarOfNationsWS {
 	}
 	
 	private function max_attempts_reached($retry_count) {
-		echo 'retries: '.$retry_count.'/'.self::$max_retries."\r\n";
+		//echo 'retries: '.$retry_count.'/'.self::$max_retries."\r\n";
 		return $retry_count >= self::$max_retries && self::$max_retries >= 0;
 	}
 	
@@ -38,12 +38,21 @@ class WarOfNationsWS {
 		);
 	}
 	
-	private function init_request($url, $proxy) {
-		$proxy_str = "{$proxy['ip_address']}:{$proxy['port']}";
-		$ch = curl_init($url);         
-		curl_setopt($ch, CURLOPT_PROXY, $proxy_str);
-		if($proxy['type'] == 'SOCKS')
-			curl_setopt($ch, CURLOPT_PROXYTYPE, CURLPROXY_SOCKS5);
+	private function init_request($url, $proxy = false) {
+		if($proxy !== false) {
+			$proxy_str = "{$proxy['ip_address']}:{$proxy['port']}";
+			$ch = curl_init($url);         
+			curl_setopt($ch, CURLOPT_PROXY, $proxy_str);
+			
+			if($proxy['type'] == 'SOCKS') // If this is a SOCKS proxy, set the type - HTTP is the default
+				curl_setopt($ch, CURLOPT_PROXYTYPE, CURLPROXY_SOCKS5);
+				
+			if($proxy['username'] != null && $proxy['password'] != null) {
+				$proxyauth = "{$proxy['username']}:{$proxy['password']}";
+				//echo "Proxy Auth: ".$proxyauth;
+				curl_setopt($ch, CURLOPT_PROXYUSERPWD, $proxyauth);
+			}
+		}
 		curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "POST");		
 		curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 		curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5); 
@@ -55,7 +64,7 @@ class WarOfNationsWS {
 	public function MakeRequest($endpoint, $data_string, $retry_count = 0) {	
 		$log_msg = "Attempt #$retry_count\r\n\r\n".$data_string;
 		$log_seq = 0;
-		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'DO_CURL_POST_JSON', $log_seq++, 'START', $endpoint, $log_msg);
+		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'MAKE_REQUEST', $log_seq++, 'START', $endpoint, $log_msg);
 			
 		if($retry_count > 0)
 			echo "Retry Attempt #$retry_count<br/>\r\n";
@@ -72,31 +81,32 @@ class WarOfNationsWS {
 		curl_setopt($ch, CURLOPT_POSTFIELDS, $data_string);
 		
 		$log_msg = "Proxy: $proxy_str\r\n\r\n".print_r($headers, true);
-		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'DO_CURL_POST_JSON', $log_seq++, 'REQUEST_INFO', null, $log_msg);
+		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'MAKE_REQUEST', $log_seq++, 'REQUEST_INFO', null, $log_msg);
 		
 		// Execute our request
 		$start = microtime(true);
 		$response_string = curl_exec($ch);
 		$end = microtime(true);
 		
-		// cleans up the curl set
+		// cleans up the curl request
 		curl_close($ch);
 		
-		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'DO_CURL_POST_JSON', $log_seq++, 'REQUEST_COMPLETE', 'Time: '.($end - $start), null);
+		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'MAKE_REQUEST', $log_seq++, 'REQUEST_COMPLETE', 'Time: '.($end - $start), null);
 		
-		echo "Curl completed in ".($end - $start)." seconds<br/>\r\n";
+		$request_time = $end - $start;
+		echo "Request completed in ".$request_time." seconds\r\n";
 		
 		// If our call failed
 		if(!$response_string) {
-			$log_msg = "Proxy: $proxy_str<br/>\r\nURL: $url<br/>\r\nData: $data_string<br/>\r\n";
-			DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'DO_CURL_POST_JSON', $log_seq++, 'ERROR_CURL_RESPONSE', 'Error occurred during curl request', $log_msg, 1);
+			$log_msg = "Proxy: {$proxy['ip_address']}:{$proxy['port']}<br/>\r\nURL: $url<br/>\r\nData: $data_string<br/>\r\n";
+			DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'MAKE_REQUEST', $log_seq++, 'ERROR_CURL_RESPONSE', 'Error occurred during curl request', $log_msg, 1);
 			
-			echo "Error occurred while getting Curl response.  Request: <br/>\r\n";
-			echo "Proxy: $proxy_str<br/>\r\n";
-			echo "URL: $url<br/>\r\n";
-			echo "Data: $data_string<br/>\r\n\r\n";
+			echo "Error occurred while getting Curl response.\r\n";
+			//echo "Proxy: {$proxy['ip_address']}:{$proxy['port']}<br/>\r\n";
+			//echo "URL: $url<br/>\r\n";
+			//echo "Data: $data_string<br/>\r\n\r\n";
 			
-			ProxyDAO::countFailure($this->db, $proxy['id']);
+			ProxyDAO::countFailure($this->db, $proxy['id'], $request_time);
 			
 			// Retry if we haven't reached our max
 			if(!$this->max_attempts_reached($retry_count))
@@ -113,26 +123,26 @@ class WarOfNationsWS {
 			// Some of our proxies decode the gzip for us, so check to see if we've been decoded
 			// If we have UTF-8 encoding already, then we might be OK after all
 			if(mb_check_encoding($response_string, 'UTF-8')) {
-				DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'DO_CURL_POST_JSON', $log_seq++, 'GZDECODE_QUESTIONABLE', 'Gzip decoding failed, but response is utf8 encoded.  We\'ll try to use it.', $response_string);
+				DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'MAKE_REQUEST', $log_seq++, 'GZDECODE_QUESTIONABLE', 'Gzip decoding failed, but response is utf8 encoded.  We\'ll try to use it.', $response_string);
 				
-				echo "Error occurred while decoding CURL response, but let's assume this is OK! <br/>\r\n";
+				echo "Error occurred while decoding CURL response, but let's assume this is OK!\r\n";
 				
 				// If we think we got a proxy error, then log it, and disable the proxy server.  Otherwise return the response
 				if(stripos($response_string, 'The maximum web proxy user limit has been reached') > 0) {
-					DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'DO_CURL_POST_JSON', $log_seq++, 'PROXY_LIMIT_REACHED', null, null);
+					DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'MAKE_REQUEST', $log_seq++, 'PROXY_LIMIT_REACHED', null, null);
 					ProxyDAO::disableProxy($this->db, $proxy['id'], 'The maximum web proxy user limit has been reached');
 				} else if(stripos($response_string, '<title>Access Den') > 0) {
-					DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'DO_CURL_POST_JSON', $log_seq++, 'ACCESS_DENIED', null, null);
+					DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'MAKE_REQUEST', $log_seq++, 'ACCESS_DENIED', null, null);
 					ProxyDAO::disableProxy($this->db, $proxy['id'], 'Access Denied Received');
 				} else {
-					ProxyDAO::countSuccess($this->db, $proxy['id']);
+					ProxyDAO::countSuccess($this->db, $proxy['id'], $request_time);
 					return $response_string;
 				}
 			} else {
-				DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'DO_CURL_POST_JSON', $log_seq++, 'GZDECODE_FAILED', 'Gzip decoding failed, and we don\'t know what to do with it.  Retry this request.', $response_string, 1);
+				DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'MAKE_REQUEST', $log_seq++, 'GZDECODE_FAILED', 'Gzip decoding failed, and we don\'t know what to do with it.  Retry this request.', $response_string, 1);
 				
-				echo "Error occurred while decoding CURL response, and we think this is a problem! <br/>\r\n";
-				ProxyDAO::countFailure($this->db, $proxy['id']);
+				echo "Error occurred while decoding CURL response, and we think this is a problem!\r\n";
+				ProxyDAO::countFailure($this->db, $proxy['id'], $request_time);
 			}
 			
 			// If we made it this far then we need to retry
@@ -143,8 +153,8 @@ class WarOfNationsWS {
 		} 
 		
 		// If we made it this far, then we were successful, to let's log it as a success to our proxy
-		ProxyDAO::countSuccess($this->db, $proxy['id']);
-		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'DO_CURL_POST_JSON', $log_seq++, 'COMPLETE', null, null);
+		ProxyDAO::countSuccess($this->db, $proxy['id'], $request_time);
+		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'MAKE_REQUEST', $log_seq++, 'COMPLETE', null, null);
 		
 		// Return the decoded string
 		return $decoded;

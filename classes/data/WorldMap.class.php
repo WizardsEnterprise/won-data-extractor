@@ -64,7 +64,8 @@ class HexMapper {
 								   'town_name' => 'town_name', 'building_id' => 'building_id', 
 								   'building_unique_id' => 'building_unique_id', 'version' => 'version', 
 								   'resource_id' => 'resource_id', 'resource_level' => 'resource_level',
-								   'destroyed' => 'destroyed', 'data_load_id' => 'data_load_id');
+								   'destroyed' => 'destroyed', 'event_entity_type' => 'event_entity_type', 
+								  'league_tier' => 'league_tier', 'data_load_id' => 'data_load_id');
 	
 	public static $excludeFromInsert = array('id');
 	public static $excludeFromUpdate = array('id', 'world_id', 'x_coord', 'y_coord');
@@ -100,6 +101,8 @@ class Hex extends ModelBase {
 	public $resource_id;
 	public $resource_level;
 	public $destroyed;
+	public $event_entity_type;
+	public $league_tier;
 	public $data_load_id;
 	public $mapper = 'HexMapper';
 }
