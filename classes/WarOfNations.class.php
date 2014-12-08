@@ -57,7 +57,7 @@ class WarOfNations {
 		
 		$this->db = DatabaseFactory::getDatabase();
 		$this->proxies = ProxyDAO::getActiveProxies($this->db);
-		$this->ws = new WarOfnationsWS($this->db, $this->proxies);
+		$this->ws = new WarOfnationsWS($this->db, $this->proxies, Constants::$url_base, Constants::$hmac_key);
 	}
 	
 	public function setDataLoadId($dlid) {

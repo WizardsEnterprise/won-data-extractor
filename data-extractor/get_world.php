@@ -1,5 +1,5 @@
 <?php
-require_once('../classes/WarOfNations.class.php');
+require_once('../classes/WarOfNations2.class.php');
 require_once('../classes/data/DataLoad.class.php');
 
 $radius = 1472;
@@ -26,7 +26,7 @@ $status = true;
 =======================================================
 */
 
-$won = new WarOfNations(0);
+$won = new WarOfNations();
 
 $won->setDataLoadId(DataLoadDAO::initNewLoad($won->db, 'WORLD_MAP', 0));
 DataLoadDAO::startLoad($won->db, $won->data_load_id);

@@ -11,11 +11,17 @@ class WarOfNationsWS {
 	
 	// List of proxy servers to use for connections.
 	private $proxies;
-	private static $max_retries = -1;
+	private $max_retries = -1;
 	
-	function __construct($db, $proxies) {
+	// Base Configuration
+	private $url_base;
+	private $hmac_key;
+	
+	function __construct($db, $proxies, $url_base, $hmac_key) {
 		$this->db = $db;
 		$this->proxies = $proxies;
+		$this->url_base = $url_base;
+		$this->hmac_key = $hmac_key;
 	}
 	
 	private function max_attempts_reached($retry_count) {
@@ -30,7 +36,7 @@ class WarOfNationsWS {
 		return array(
 		  	'Accept: application/json',
 			'Content-type: application/json; charset=UTF-8;',
-			'X-Signature: ' . hash_hmac('md5', $hmac_secret, Constants::$hmac_key, false),
+			'X-Signature: ' . hash_hmac('md5', $hmac_secret, $this->hmac_key, false),
 			'X-Timestamp: ' . $time,
 			'User-Agent: Dalvik/1.6.0 (Linux; U; Android 4.4.2; SCH-I545 Build/KOT49H)',
 			'Connection: Keep-Alive',
@@ -39,6 +45,7 @@ class WarOfNationsWS {
 	}
 	
 	private function init_request($url, $proxy = false) {
+		// If we're using a proxy server for this request, set the curl options
 		if($proxy !== false) {
 			$proxy_str = "{$proxy['ip_address']}:{$proxy['port']}";
 			$ch = curl_init($url);         
@@ -46,23 +53,24 @@ class WarOfNationsWS {
 			
 			if($proxy['type'] == 'SOCKS') // If this is a SOCKS proxy, set the type - HTTP is the default
 				curl_setopt($ch, CURLOPT_PROXYTYPE, CURLPROXY_SOCKS5);
-				
+			
+			// If this proxy has a username and apssword, set the authentication string
 			if($proxy['username'] != null && $proxy['password'] != null) {
 				$proxyauth = "{$proxy['username']}:{$proxy['password']}";
-				//echo "Proxy Auth: ".$proxyauth;
 				curl_setopt($ch, CURLOPT_PROXYUSERPWD, $proxyauth);
 			}
 		}
+		
 		curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "POST");		
 		curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-		curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5); 
-		curl_setopt($ch, CURLOPT_TIMEOUT, 10); //timeout in seconds
+		curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5); // Timeout in seconds - prevents taking a long time to connect to a bad proxy
+		curl_setopt($ch, CURLOPT_TIMEOUT, 10); // Timeout in seconds - prevents taking a long time to connect to a bad proxy
 		
 		return $ch;
 	}
 	
 	public function MakeRequest($endpoint, $data_string, $retry_count = 0) {	
-		$log_msg = "Attempt #$retry_count\r\n\r\n".$data_string;
+		$log_msg = "Attempt #".($retry_count + 1)."\r\n\r\n".$data_string;
 		$log_seq = 0;
 		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'MAKE_REQUEST', $log_seq++, 'START', $endpoint, $log_msg);
 			
@@ -70,7 +78,7 @@ class WarOfNationsWS {
 			echo "Retry Attempt #$retry_count<br/>\r\n";
 		
 		// Assemble our URL
-		$url = Constants::$url_base.$endpoint;
+		$url = $this->url_base.$endpoint;
 		
 		// Initialize our Curl request
 		$headers = $this->get_headers($endpoint, $data_string);

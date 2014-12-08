@@ -1,5 +1,5 @@
 <?php
-require_once('../classes/WarOfNations.class.php');
+require_once('../classes/WarOfNations2.class.php');
 require_once('../classes/data/DataLoad.class.php');
 
 $debug = false;
@@ -15,7 +15,7 @@ $interval = 50;
 */
 
 
-$won = new WarOfNations(0);
+$won = new WarOfNations();
 
 $won->setDataLoadId(DataLoadDAO::initNewLoad($won->db, 'PLAYER_LEADERBOARDS', $top_x_players/$interval));
 DataLoadDAO::startLoad($won->db, $won->data_load_id);

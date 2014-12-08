@@ -90,6 +90,9 @@ class DataAccess {
 	function SelectValue($query, $params) {
 		$stmt = $this->PrepareAndExecuteQuery($query, $params);
 		
+		// If the statement failed to execute, return false
+		if (!$stmt) return false;
+		
 		try {
 			$retVal = $stmt->fetchColumn();
 		} catch (PDOException $e) {
@@ -105,6 +108,9 @@ class DataAccess {
 	// Returns: The array of results from the select statement on success, FALSE otherwise
 	function Select($query, $params = array()) {
 		$stmt = $this->PrepareAndExecuteQuery($query, $params);
+		
+		// If the statement failed to execute, return false
+		if (!$stmt) return false;
 		
 		try {
 			$retVal = $stmt->fetchAll(PDO::FETCH_ASSOC);

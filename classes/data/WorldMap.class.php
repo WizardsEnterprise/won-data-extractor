@@ -1,5 +1,5 @@
 <?php
-require_once('MapperBase.class.php');
+require_once('MapperHelper.class.php');
 require_once('ModelBase.class.php');
 
 class WorldMapDAO {
@@ -72,12 +72,12 @@ class HexMapper {
 	
 	public static function ColumnNames($operation, $customExcludes = array()) {
 		$arr = "excludeFrom$operation";
-		return MapperBase::ColumnNames(self::$mapping, array_merge(self::$$arr, $customExcludes));
+		return MapperHelper::ColumnNames(self::$mapping, array_merge(self::$$arr, $customExcludes));
 	}
 
 	public static function GetParamValues($obj, $operation, $customExcludes = array()) {
 		$arr = "excludeFrom$operation";
-		return MapperBase::GetParamValues($obj, $operation, self::$mapping, array_merge(self::$$arr, $customExcludes));
+		return MapperHelper::GetParamValues($obj, $operation, self::$mapping, array_merge(self::$$arr, $customExcludes));
 	}
 }
 

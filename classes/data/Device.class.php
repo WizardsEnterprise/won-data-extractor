@@ -1,5 +1,5 @@
 <?php
-require_once('MapperBase.class.php');
+require_once('MapperHelper.class.php');
 require_once('ModelBase.class.php');
 
 class DeviceDAO {
@@ -37,19 +37,20 @@ class DeviceDAO {
 
 class DeviceMapper {
 	public static $mapping = array('id' => 'id', 'device_uuid' => 'device_uuid', 'mac_address' => 'mac_address',
-								   'platform' => 'platform', 'version' => 'version', 'device_type' => 'device_type');
+								   'platform' => 'platform', 'version' => 'version', 'device_type' => 'device_type',
+								   'use_proxy' => 'use_proxy');
 	
 	public static $excludeFromInsert = array('id');
 	public static $excludeFromUpdate = array('id', 'world_id', 'game_guild_id');
 					
 	public static function ColumnNames($operation, $customExcludes = array()) {
 		$arr = "excludeFrom$operation";
-		return MapperBase::ColumnNames(self::$mapping, array_merge(self::$$arr, $customExcludes));
+		return MapperHelper::ColumnNames(self::$mapping, array_merge(self::$$arr, $customExcludes));
 	}
 
 	public static function GetParamValues($obj, $operation, $customExcludes = array()) {
 		$arr = "excludeFrom$operation";
-		return MapperBase::GetParamValues($obj, $operation, self::$mapping, array_merge(self::$$arr, $customExcludes));
+		return MapperHelper::GetParamValues($obj, $operation, self::$mapping, array_merge(self::$$arr, $customExcludes));
 	}
 }
 
@@ -60,6 +61,7 @@ class Device extends ModelBase{
 	public $platform;
 	public $version;
 	public $device_type;
+	public $use_proxy;
 	public $mapper = 'DeviceMapper';
 }
 ?>

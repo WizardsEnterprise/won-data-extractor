@@ -20,7 +20,7 @@ class DataLoadDAO {
 		$rows_updated = $db->Update("UPDATE data_loads d SET status = 'STARTED' WHERE d.id = ?", array($data_load_id));
 		
 		if($db->hasError()) {
-			echo 'Error inserting log: ';
+			echo 'Error updating log: ';
 			print_r($db->getError());
 			echo "\r\n";
 		}
@@ -29,10 +29,10 @@ class DataLoadDAO {
 	}
 	
 	public static function operationComplete($db, $data_load_id) {
-		$rows_updated = $db->Insert("UPDATE data_loads d SET current_operation = current_operation + 1 WHERE d.id = ?", array($data_load_id));
+		$rows_updated = $db->Update("UPDATE data_loads d SET current_operation = current_operation + 1 WHERE d.id = ?", array($data_load_id));
 	
 		if($db->hasError()) {
-			echo 'Error inserting log: ';
+			echo 'Error updating log: ';
 			print_r($db->getError());
 			echo "\r\n";
 		}
@@ -41,10 +41,10 @@ class DataLoadDAO {
 	}
 	
 	public static function loadComplete($db, $data_load_id) {
-		$rows_updated = $db->Update("UPDATE data_loads d SET status = 'COMPLETED' WHERE d.id = ?", array($data_load_id));
+		$rows_updated = $db->Update("UPDATE data_loads d SET status = 'COMPLETED', completed = NOW() WHERE d.id = ?", array($data_load_id));
 		
 		if($db->hasError()) {
-			echo 'Error inserting log: ';
+			echo 'Error updating log: ';
 			print_r($db->getError());
 			echo "\r\n";
 		}

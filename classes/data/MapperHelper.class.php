@@ -1,5 +1,5 @@
 <?php
-class MapperBase {
+class MapperHelper {
 	public static function ColumnNames($mapping, $excludes = array()) {
 		return array_diff(array_keys($mapping), $excludes);
 	}
