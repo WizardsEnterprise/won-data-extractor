@@ -16,9 +16,9 @@ class WarOfNationsAuthentication {
 	// Device info
 	public $device_id;
 	public $mac_address;
-	public $device_platform = 'android';
-	public $device_version = '4.4.2';
-	public $device_type = 'SCH-I545';
+	public $device_platform;
+	public $device_version;
+	public $device_type;
 	
 	// Player/session info
 	public $authenticated = false;
@@ -71,7 +71,7 @@ class WarOfNationsAuthentication {
 		// If we're not making a new device, then get the active device from our database
 		if(!$new) {
 			$device = DeviceDAO::getActiveDevice($this->db);
-			//print_r($device);
+			
 			$this->device_id = $device['device_uuid'];
 			$this->mac_address = $device['mac_address'];
 			$this->device_platform = $device['platform'];
@@ -82,6 +82,9 @@ class WarOfNationsAuthentication {
 		
 			$this->device_id = self::generate_device_id();
 			$this->mac_address = self::generate_mac_address();
+			$this->device_platform = PgrmConfigDAO::getConfigProperty($this->db, 'value1', 'NEW_DEVICE', 'PLATFORM');
+			$this->device_version = PgrmConfigDAO::getConfigProperty($this->db, 'value1', 'NEW_DEVICE', 'VERSION');
+			$this->device_type = PgrmConfigDAO::getConfigProperty($this->db, 'value1', 'NEW_DEVICE', 'TYPE');
 		}
 		
 		// Cache our device information as parameters in the data extractor
@@ -111,7 +114,7 @@ class WarOfNationsAuthentication {
 		$log_msg = "Player ID: {$this->player_id}, Session ID: {$this->session_id}";
 		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'AUTHENTICATE', $log_seq++, 'RESPONSE', $log_msg, print_r($response, true));
 	
-		// If this was a new device, then save it
+		// If this was a new device, then save it to the database for future use
 		if($new) {
 			$device = new Device();
 			$device->device_uuid = $device_id;

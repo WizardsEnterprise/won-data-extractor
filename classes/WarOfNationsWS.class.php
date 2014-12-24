@@ -11,7 +11,7 @@ class WarOfNationsWS {
 	
 	// List of proxy servers to use for connections.
 	private $proxies;
-	private $max_retries = -1;
+	private static $max_retries = -1;
 	
 	// Base Configuration
 	private $url_base;
@@ -26,7 +26,7 @@ class WarOfNationsWS {
 	
 	private function max_attempts_reached($retry_count) {
 		//echo 'retries: '.$retry_count.'/'.self::$max_retries."\r\n";
-		return $retry_count >= self::$max_retries && self::$max_retries >= 0;
+		return self::$max_retries >= 0 && $retry_count >= self::$max_retries;
 	}
 	
 	private function get_headers($endpoint, $data_string) {

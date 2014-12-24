@@ -62,13 +62,13 @@ class HexMapper {
 	public static $mapping = array('id' => 'id', 'world_id' => 'world_id', 'x_coord' => 'hex_x', 'y_coord' => 'hex_y',
 								   'type' => 'type', 'player_id' => 'player_id', 'town_id' => 'town_id',
 								   'town_name' => 'town_name', 'building_id' => 'building_id', 
-								   'building_unique_id' => 'building_unique_id', 'version' => 'version', 
-								   'resource_id' => 'resource_id', 'resource_level' => 'resource_level',
+								   'building_unique_id' => 'building_unique_id', 'is_sb' => 'is_sb', 'is_npc' => 'is_npc',
+								   'version' => 'version', 'resource_id' => 'resource_id', 'resource_level' => 'resource_level',
 								   'destroyed' => 'destroyed', 'event_entity_type' => 'event_entity_type', 
-								  'league_tier' => 'league_tier', 'data_load_id' => 'data_load_id');
+								   'league_tier' => 'league_tier', 'data_load_id' => 'data_load_id');
 	
-	public static $excludeFromInsert = array('id');
-	public static $excludeFromUpdate = array('id', 'world_id', 'x_coord', 'y_coord');
+	public static $excludeFromInsert = array('id', 'is_sb');
+	public static $excludeFromUpdate = array('id', 'world_id', 'x_coord', 'y_coord', 'is_sb');
 	
 	public static function ColumnNames($operation, $customExcludes = array()) {
 		$arr = "excludeFrom$operation";
@@ -77,6 +77,10 @@ class HexMapper {
 
 	public static function GetParamValues($obj, $operation, $customExcludes = array()) {
 		$arr = "excludeFrom$operation";
+		
+		// Set calculated values
+		$obj->is_npc = $obj->town_name === 'Renegade Outpost' ? 1 : 0;
+		
 		return MapperHelper::GetParamValues($obj, $operation, self::$mapping, array_merge(self::$$arr, $customExcludes));
 	}
 }
@@ -97,6 +101,8 @@ class Hex extends ModelBase {
 	public $guild_name;
 	public $building_id;
 	public $building_unique_id;
+	public $is_sb;
+	public $is_npc;
 	public $version;
 	public $resource_id;
 	public $resource_level;

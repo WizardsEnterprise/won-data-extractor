@@ -96,8 +96,14 @@ class WorldMapExtractor {
 		
 		// Get the Hexes section of the world response
 		$world = $world_response['responses'][0]['return_value']['hexes'];
-		
 		$hex_count = 0;
+		
+		if(empty($world)) {
+			DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'PARSE_SAVE_WORLD_MAP', $log_seq++, 'COMPLETE', "Created $hex_count Hexes", null);
+			echo "No hexes found.\r\n";
+			return;
+		}
+
 		// Parse and store each Hex
 		foreach($world as $key => $hex_arr) {
 			$hex_count++;
