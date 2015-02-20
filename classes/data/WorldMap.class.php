@@ -67,8 +67,8 @@ class HexMapper {
 								   'destroyed' => 'destroyed', 'event_entity_type' => 'event_entity_type', 
 								   'league_tier' => 'league_tier', 'data_load_id' => 'data_load_id');
 	
-	public static $excludeFromInsert = array('id', 'is_sb');
-	public static $excludeFromUpdate = array('id', 'world_id', 'x_coord', 'y_coord', 'is_sb');
+	public static $excludeFromInsert = array('id');
+	public static $excludeFromUpdate = array('id', 'world_id', 'x_coord', 'y_coord');
 	
 	public static function ColumnNames($operation, $customExcludes = array()) {
 		$arr = "excludeFrom$operation";
@@ -77,9 +77,6 @@ class HexMapper {
 
 	public static function GetParamValues($obj, $operation, $customExcludes = array()) {
 		$arr = "excludeFrom$operation";
-		
-		// Set calculated values
-		$obj->is_npc = $obj->town_name === 'Renegade Outpost' ? 1 : 0;
 		
 		return MapperHelper::GetParamValues($obj, $operation, self::$mapping, array_merge(self::$$arr, $customExcludes));
 	}
@@ -111,5 +108,8 @@ class Hex extends ModelBase {
 	public $league_tier;
 	public $data_load_id;
 	public $mapper = 'HexMapper';
+	
+	// Unstored Parameters
+	public $town_radius;
 }
 ?>

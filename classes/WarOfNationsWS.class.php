@@ -88,7 +88,7 @@ class WarOfNationsWS {
 		curl_setopt($ch, CURLOPT_HTTPHEADER, $headers); 
 		curl_setopt($ch, CURLOPT_POSTFIELDS, $data_string);
 		
-		$log_msg = "Proxy: $proxy_str\r\n\r\n".print_r($headers, true);
+		$log_msg = "Proxy: {$proxy['ip_address']}:{$proxy['port']}\r\n\r\n".print_r($headers, true);
 		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'MAKE_REQUEST', $log_seq++, 'REQUEST_INFO', null, $log_msg);
 		
 		// Execute our request

@@ -67,23 +67,37 @@ class WorldMapExtractor {
 		$params['y_range'] = $y_range;
 		//$data_string = '[{"transaction_time":"'.$transaction_time.'","platform":"'.$device_platform.'","session_id":"'.$session_id.'","start_sequence_num":1,"iphone_udid":"'.$device_id.'","wd_player_id":0,"locale":"en-US","_explicitType":"Session","client_build":"'.Constants::$client_build.'","game_name":"'.Constants::$game_name.'","api_version":"'.Constants::$api_version.'","mac_address":"'.$mac_address.'","end_sequence_num":1,"req_id":1,"player_id":'.$player_id.',"language":"en","game_data_version":"'.Constants::$game_data_version.'","client_version":"'.Constants::$client_version.'"},[{"service":"world.world","method":"get_map_data","_explicitType":"Command","params":[[['.$x_start.','.$y_start.','.$x_range.','.$y_range.']]]}]]';
 		
-		while(true) {
-			$result_string = $this->de->MakeRequest('GET_MAP_DATA', $params);
-			if(!$result_string) return false;
+		$retry_count = 0;
 		
-			$result = json_decode($result_string, true);
-			if($result == null) {
-				DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'GET_WORLD_MAP', $log_seq++, 'JSON_DECODE_FAILED', null, $result_string, 1);
+		// We'll try this 3 times in case the request comes back with no information
+		while($retry_count < 3) {
+			if($retry_count > 0)
+				DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'GET_WORLD_MAP', $log_seq++, 'RETRYING', "Retry #$retry_count", null, 0);
+			
+			// If we get a response but can't decode it, we retry infinitely... that's probably not the best solution	
+			while(true) {
+				$result_string = $this->de->MakeRequest('GET_MAP_DATA', $params);
+				if(!$result_string) return false;
+		
+				$result = json_decode($result_string, true);
+				if($result == null) {
+					DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'GET_WORLD_MAP', $log_seq++, 'JSON_DECODE_FAILED', null, $result_string, 1);
 				
-				echo "Error: Failed to decode JSON string: $result_string\r\n";
-				continue;
+					echo "Error: Failed to decode JSON string: $result_string\r\n";
+					continue;
+				}
+				break;
 			}
-			break;
+		
+			DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'GET_WORLD_MAP', $log_seq++, 'RESPONSE', null, print_r($result, true));
+
+			// This will return false if there's no useable data in the response and we'll try again
+			$status = $this->ParseAndSaveWorldMap($result);
+			if($status === true)
+				break;
+			else
+				$retry_count++;
 		}
-		
-		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'GET_WORLD_MAP', $log_seq++, 'RESPONSE', null, print_r($result, true));
-		
-		$this->ParseAndSaveWorldMap($result);
 		
 		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'GET_WORLD_MAP', $log_seq++, 'COMPLETE', null, null);
 		
@@ -95,13 +109,24 @@ class WorldMapExtractor {
 		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'PARSE_SAVE_WORLD_MAP', $log_seq++, 'START', null, null);
 		
 		// Get the Hexes section of the world response
+		$success = $world_response['responses'][0]['return_value']['success'];
+		
+		if($success != 1) {
+			$reason = $world_response['responses'][0]['return_value']['reason'];
+			DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'PARSE_SAVE_WORLD_MAP', $log_seq++, 'GET_MAP_DATA_ERROR', $reason, null, 1);
+			
+			// Even though this is technically a failure, we return true because we don't want to retry this request
+			return true;
+		}
+		
 		$world = $world_response['responses'][0]['return_value']['hexes'];
 		$hex_count = 0;
 		
+		// Sometimes this happens but I'm not sure why... so I created a return code to try again...
 		if(empty($world)) {
-			DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'PARSE_SAVE_WORLD_MAP', $log_seq++, 'COMPLETE', "Created $hex_count Hexes", null);
+			DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'PARSE_SAVE_WORLD_MAP', $log_seq++, 'NO_HEXES_FOUND', null, null, 1);
 			echo "No hexes found.\r\n";
-			return;
+			return false;
 		}
 
 		// Parse and store each Hex
@@ -147,9 +172,17 @@ class WorldMapExtractor {
 			// Set the world ID and game player ID
 			$player->world_id = $hex->world_id;
 			$player->game_player_id = $game_player_id;
+
+			// Initialize flags to NULL
+			$hex->is_sb = null;
+			$hex->is_npc = null;
 			
 			// If this is a town tile then we have additional information, so let's process it
 			if(isset($hex->town_name) || in_array($hex->building_id, array(14))) {
+				// Set base properties
+				$hex->is_sb = ($hex->town_radius == 2 and $hex->building_id == 1) ? 1 : 0;
+				$hex->is_npc = $hex->town_name === 'Renegade Outpost' ? 1 : 0;
+				
 				// Set the player's name and level
 				$player->player_name = $hex->player_name;
 				$player->level = $hex->player_level;
@@ -184,9 +217,6 @@ class WorldMapExtractor {
 					$player->guild_id = $guild_id;
 				}
 			}
-			
-			/*if($game_player_id == '101013592272409')
-				var_dump($player);*/
 			
 			// If this player didn't already exist in our database, create it.  Otherwise, update it.
 			if(!$player_id) {
@@ -245,6 +275,7 @@ class WorldMapExtractor {
 		
 		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'PARSE_SAVE_WORLD_MAP', $log_seq++, 'COMPLETE', "Created $hex_count Hexes", null);
 		echo "Created $hex_count Hexes\r\n";
+		return true;
 	}
 }
 ?>

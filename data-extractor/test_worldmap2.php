@@ -7,6 +7,6 @@ $won = new WarOfNations();
 $won->setDataLoadId(DataLoadDAO::initNewLoad($won->db, 'TEST_WORLDMAP2', 0));
 DataLoadDAO::startLoad($won->db, $won->data_load_id);
 
-$won->GetWorldMap(-95, -570, 100, 100);
+$won->GetWorldMap(-190, -475, 100, 100);
 
 ?>
