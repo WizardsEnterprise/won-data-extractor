@@ -37,6 +37,10 @@ class WarOfNationsDataExtractor {
 		
 		$this->ws = new WarOfnationsWS($this->db, $proxies, $url_base, $hmac_key);
 	}
+
+	public function DisableProxy() {
+		$this->ws->DisableProxy();
+	}
 	
 	public function setDataLoadId($dlid) {
 		$this->data_load_id = $dlid;

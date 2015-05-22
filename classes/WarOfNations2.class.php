@@ -4,6 +4,7 @@ require_once('WarOfNationsDataExtractor.class.php');
 require_once('WarOfNationsAuthentication.class.php');
 require_once('WorldMapExtractor.class.php');
 require_once('LeaderboardExtractor.class.php');
+require_once('GameOperations.class.php');
 
 class WarOfNations {
 	// Database
@@ -25,7 +26,7 @@ class WarOfNations {
 		$this->de = new WarOfNationsDataExtractor($this->db);
 	}
 	
-	public function setDataLoadId($dlid) {
+	function setDataLoadId($dlid) {
 		$this->data_load_id = $dlid;
 		$this->de->setDataLoadId($dlid);
 		
@@ -39,22 +40,23 @@ class WarOfNations {
 			$this->leaders->setDataLoadId($dlid);
 	}
 	
-	function Authenticate() {
+	function Authenticate($return_full_response = false) {
 		// If the authentication object hasn't been initialized yet, initialize it
 		if ($this->auth === false)
 			$this->auth = new WarOfNationsAuthentication($this->db, $this->de, $this->data_load_id);
 		
 		// If we aren't already authenticated, authenticate ourselves now
 		if (!$this->auth->authenticated)
-			$this->auth->Authenticate();
+			return $this->auth->Authenticate(false, $return_full_response);
+		return true;
 	}
 	
 	// Call the web service to get the world map and then parse and save it in the database
-	public function GetWorldMap($x_start = 0, $y_start = 0, $x_range = 50, $y_range = 50) {
+	function GetWorldMap($x_start = 0, $y_start = 0, $x_range = 50, $y_range = 50) {
 		// Ensure that we're authenticated already
 		$this->Authenticate();
 		
-		// If the authentication object hasn't been initialized yet, initialize it
+		// If the extraction object hasn't been initialized yet, initialize it
 		if ($this->map === false)
 			$this->map = new WorldMapExtractor($this->db, $this->de, $this->data_load_id, $this->auth);
 		
@@ -71,11 +73,32 @@ class WarOfNations {
 		// Ensure that we're authenticated already
 		$this->Authenticate();
 		
-		// If the authentication object hasn't been initialized yet, initialize it
+		// If the extraction object hasn't been initialized yet, initialize it
 		if ($this->leaders === false)
 			$this->leaders = new LeaderboardExtractor($this->db, $this->de, $this->data_load_id, $this->auth);
 		
 		$this->leaders->GetLeaderboard($leaderboard_id, $start_index);
+	}
+
+	// Join a new world
+	function JoinNewWorld($world_id) {
+		// Ensure that we're authenticated already
+		$this->Authenticate();
+		
+		$this->auth->JoinNewWorld($world_id);
+	}
+
+	function SwitchWorld($world_id) {
+		// Ensure that we're authenticated already
+		$this->Authenticate();
+		
+		$this->auth->SwitchWorld($world_id);
+	}
+
+	function GetGameOperations() {
+		$this->Authenticate();
+
+		return $this->map = new GameOperations($this->db, $this->de, $this->data_load_id, $this->auth);
 	}
 }
 

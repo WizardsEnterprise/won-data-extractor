@@ -5,6 +5,7 @@ class DataAccess {
 	
 	protected $errno = false;
 	protected $errorMsg = false;
+	protected $errorSql = false;
 	
 	// Constructor - 
 	// Parameters: Host, Username, Password, Database
@@ -24,18 +25,20 @@ class DataAccess {
 	}
 	
 	function getError() {
-		return array('ErrorCode' => $this->errno, 'ErrorMessage' => $this->errorMsg);
+		return array('ErrorSql' => $this->errorSql, 'ErrorCode' => $this->errno, 'ErrorMessage' => $this->errorMsg);
 	}
 	
 	private function PrepareAndExecuteQuery($query, $params) {
 		$this->errno = false;
 		$this->errorMsg = false;
+		$this->errorSql = false;
 		
 		try {
 			$stmt = $this->conn->prepare($query);
 		} catch (PDOException $e) {
 			$this->errno = $e->getCode();
 			$this->errorMsg = $e->getMessage();
+			$this->errorSql = "Error Preparing Statement: \r\n".$query."\r\n".print_r($params, true);
 			return false;
 		}
 		
@@ -44,6 +47,8 @@ class DataAccess {
 		} catch (PDOException $e) {
 		    $this->errno = $e->getCode();
 			$this->errorMsg = $e->getMessage();
+			$this->errorSql = "Error Executing Statement: \r\n".$query."\r\n".print_r($params, true);
+
 			return false;
 		}
 		
@@ -60,9 +65,18 @@ class DataAccess {
 			}
 				
 		}
-		$this->PrepareAndExecuteQuery($query, $params);
+
+		//echo "Insert: $query\r\n";
+		//var_dump($params);
+
+		$stmt = $this->PrepareAndExecuteQuery($query, $params);
 		
+		if(!$stmt)
+			return 0;
+
 		$id = $this->conn->lastInsertID();
+
+		//echo "ID: $id\r\n";
 		
 		return $id;
 	}
@@ -75,11 +89,19 @@ class DataAccess {
 			if(!isset($params[$key])) {
 				$params[$key] = null;
 			}
-				
 		}
+
+		//echo "Update: $query\r\n";
+		//var_dump($params);
+
 		$stmt = $this->PrepareAndExecuteQuery($query, $params);
 		
+		if(!$stmt)
+			return 0;
+
 		$count = $stmt->rowCount();
+
+		//echo "Count: $count\r\n";
 		
 		return $count;
 	}

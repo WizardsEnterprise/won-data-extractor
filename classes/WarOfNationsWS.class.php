@@ -68,6 +68,10 @@ class WarOfNationsWS {
 		
 		return $ch;
 	}
+
+	public function DisableProxy() {
+		$this->proxies = false;
+	}
 	
 	public function MakeRequest($endpoint, $data_string, $retry_count = 0) {	
 		$log_msg = "Attempt #".($retry_count + 1)."\r\n\r\n".$data_string;
@@ -82,7 +86,8 @@ class WarOfNationsWS {
 		
 		// Initialize our Curl request
 		$headers = $this->get_headers($endpoint, $data_string);
-		$proxy = $this->proxies[array_rand($this->proxies)];
+		if($this->proxies != false)
+			$proxy = $this->proxies[array_rand($this->proxies)];
 		
 		$ch = $this->init_request($url, $proxy);
 		curl_setopt($ch, CURLOPT_HTTPHEADER, $headers); 
@@ -162,7 +167,7 @@ class WarOfNationsWS {
 		
 		// If we made it this far, then we were successful, to let's log it as a success to our proxy
 		ProxyDAO::countSuccess($this->db, $proxy['id'], $request_time);
-		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'MAKE_REQUEST', $log_seq++, 'COMPLETE', null, null);
+		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'MAKE_REQUEST', $log_seq++, 'COMPLETE', null, $decoded);
 		
 		// Return the decoded string
 		return $decoded;

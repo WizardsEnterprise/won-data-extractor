@@ -55,7 +55,8 @@ class WorldMapExtractor {
 		*/
 		
 		$log_seq = 0;
-		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'GET_WORLD_MAP', $log_seq++, 'START', "World: {$this->auth->world_id}, X: $x_start, Y: $y_start, X_RANGE: $x_range, Y_RANGE: $y_range", null);
+		$descriptor = "World: {$this->auth->world_id}, X: $x_start, Y: $y_start, X_RANGE: $x_range, Y_RANGE: $y_range";
+		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'GET_WORLD_MAP', $log_seq++, 'START', $descriptor, null);
 		
 		echo "Getting World Map...\r\n";
 		
@@ -92,28 +93,28 @@ class WorldMapExtractor {
 			DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'GET_WORLD_MAP', $log_seq++, 'RESPONSE', null, print_r($result, true));
 
 			// This will return false if there's no useable data in the response and we'll try again
-			$status = $this->ParseAndSaveWorldMap($result);
+			$status = $this->ParseAndSaveWorldMap($result, $descriptor);
 			if($status === true)
 				break;
 			else
 				$retry_count++;
 		}
 		
-		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'GET_WORLD_MAP', $log_seq++, 'COMPLETE', null, null);
+		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'GET_WORLD_MAP', $log_seq++, 'COMPLETE', $descriptor, null);
 		
 		return true;
 	}
 	
-	public function ParseAndSaveWorldMap($world_response) {
+	public function ParseAndSaveWorldMap($world_response, $descriptor) {
 		$log_seq = 0;
-		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'PARSE_SAVE_WORLD_MAP', $log_seq++, 'START', null, null);
+		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'PARSE_SAVE_WORLD_MAP', $log_seq++, 'START', $descriptor, null);
 		
 		// Get the Hexes section of the world response
 		$success = $world_response['responses'][0]['return_value']['success'];
 		
 		if($success != 1) {
 			$reason = $world_response['responses'][0]['return_value']['reason'];
-			DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'PARSE_SAVE_WORLD_MAP', $log_seq++, 'GET_MAP_DATA_ERROR', $reason, null, 1);
+			DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'PARSE_SAVE_WORLD_MAP', $log_seq++, 'GET_MAP_DATA_ERROR', $reason, $descriptor, 1);
 			
 			// Even though this is technically a failure, we return true because we don't want to retry this request
 			return true;
@@ -124,7 +125,7 @@ class WorldMapExtractor {
 		
 		// Sometimes this happens but I'm not sure why... so I created a return code to try again...
 		if(empty($world)) {
-			DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'PARSE_SAVE_WORLD_MAP', $log_seq++, 'NO_HEXES_FOUND', null, null, 1);
+			DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'PARSE_SAVE_WORLD_MAP', $log_seq++, 'NO_HEXES_FOUND', $descriptor, null, 1);
 			echo "No hexes found.\r\n";
 			return false;
 		}
@@ -141,14 +142,10 @@ class WorldMapExtractor {
 			$hex->world_id = $this->auth->world_id;
 			
 			// Recalculate the x coordinate.  Not sure why they store the data this way.
-			$hex->hex_x = self::convertToMapCoordinate($hex->hex_x, $hex->hex_y);
+			$hex->hex_x = (int)self::convertToMapCoordinate($hex->hex_x, $hex->hex_y);
 			
-			// Get the Hex ID if this Hex already exists
-			$hex_id = WorldMapDAO::getLocalIdFromGameId($this->db, $hex->world_id, $hex->hex_x, $hex->hex_y);
-			
-			// If we found it, set it so that we can update the existing hex record
-			if($hex_id)
-				$hex->id = $hex_id;
+			// Check if this hex already exists so we know whether we're inserting or updating
+			$hex_exists = WorldMapDAO::checkHexExists($this->db, $hex->world_id, $hex->hex_x, $hex->hex_y);
 			
 			if($hex->building_id)
 				$hex->building_id = BuildingDAO::getLocalIdFromGameId($this->db, $hex->building_id);
@@ -249,7 +246,7 @@ class WorldMapExtractor {
 				$hex->player_id = $player_id;
 			
 			// Insert or update the hex record
-			if($hex->id == null) {
+			if($hex_exists == false) {
 				$hex_id = WorldMapDAO::insertHex($this->db, $hex);
 				if($this->db->hasError()) {
 					echo 'Error inserting Hex: ';
@@ -273,7 +270,7 @@ class WorldMapExtractor {
 			}
 		}
 		
-		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'PARSE_SAVE_WORLD_MAP', $log_seq++, 'COMPLETE', "Created $hex_count Hexes", null);
+		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'PARSE_SAVE_WORLD_MAP', $log_seq++, 'COMPLETE', "Created $hex_count Hexes", $descriptor);
 		echo "Created $hex_count Hexes\r\n";
 		return true;
 	}

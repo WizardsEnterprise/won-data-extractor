@@ -3,10 +3,9 @@ require_once('../classes/WarOfNations2.class.php');
 require_once('../classes/data/DataLoad.class.php');
 
 $radius = 1472;
-//$radius = 200;
 $r2 = pow($radius, 2);
-$interval = 95;
-$scan_size = 100;
+$interval = 50;
+$scan_size = 50;
 $r2_offset = pow($radius + $interval, 2) - $r2;
 
 // If we want to get a scan of an area around a base, change these values
@@ -18,6 +17,8 @@ $cur_y = 0;
 $cur_quadrant = 0; // 0 = top left, 1 = top right, 2 = bottom right, 3 = bottom left
 $count = 0;
 $status = true;
+
+$min_radius = 1350;
 
 
 /*
@@ -63,16 +64,23 @@ while($cur_quadrant <= 3) {
 					break;
 			}
 			
-			$count++;
+			
 			echo "Getting $tx, $ty\r\n";
-			$status = $won->GetWorldMap($tx, $ty, $scan_size, $scan_size);
-			if(!$status) {
-				echo "Error: Failed to load map for $tx, $ty\r\n";
-				break;
+
+			// Use this to get only outside of the map if wanted.
+			if(sqrt(pow($cur_x, 2) + pow($cur_y, 2) - pow($cur_y/2, 2)) >= $min_radius){
+				$count++;
+				$status = $won->GetWorldMap($tx, $ty, $scan_size, $scan_size);
+
+				if(!$status) {
+					echo "Error: Failed to load map for $tx, $ty\r\n";
+					break;
+				}
+				DataLoadDAO::operationComplete($won->db, $won->data_load_id);
+				usleep(500000); // Wait half a second between calls - just because
 			}
-			DataLoadDAO::operationComplete($won->db, $won->data_load_id);
+
 			$cur_x += $interval;
-			usleep(500000); // Wait half a second between calls - just because
 		}
 		if(!$status) break;
 		$cur_y += $interval;

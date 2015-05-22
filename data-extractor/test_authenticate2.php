@@ -9,4 +9,5 @@ DataLoadDAO::startLoad($won->db, $won->data_load_id);
 
 $won->Authenticate();
 
+DataLoadDAO::loadComplete($won->db, $won->data_load_id);
 ?>
