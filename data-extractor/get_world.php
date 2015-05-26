@@ -4,8 +4,8 @@ require_once('../classes/data/DataLoad.class.php');
 
 $radius = 1472;
 $r2 = pow($radius, 2);
-$interval = 50;
-$scan_size = 50;
+$interval = 95; // Normal: 95
+$scan_size = 100; // Normal: 100
 $r2_offset = pow($radius + $interval, 2) - $r2;
 
 // If we want to get a scan of an area around a base, change these values
@@ -18,7 +18,9 @@ $cur_quadrant = 0; // 0 = top left, 1 = top right, 2 = bottom right, 3 = bottom 
 $count = 0;
 $status = true;
 
-$min_radius = 1350;
+// Change this to exclude any areas of the map that normally result in "out of bounds" errors.
+// Recommended setting for detailed scanning: 1350
+$min_radius = 0;
 
 
 /*

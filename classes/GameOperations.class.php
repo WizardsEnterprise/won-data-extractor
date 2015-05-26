@@ -14,8 +14,11 @@ class GameOperations {
 	private $auth;
 
 	// Unit Mapping
-	private $unit_mapping = array();
+	private static $unit_mapping = array('Jeep' => 1011, 'Helicopter' => 1003, 'Hailstorm' => 1017, 'Artillery' => 1004, 'Railgun Tank' => 1002);
 	
+	// Attack Type Mapping
+	private static $attack_type_mapping = array('Capture' => 0, 'Attack' => 1);
+
 	function __construct($db, $de, $dlid, $auth) {
 		$this->db = $db;
 		$this->de = $de;
@@ -27,20 +30,57 @@ class GameOperations {
 		$this->data_load_id = $dlid;
 	}
 
-	private function BuildAttack($unit_list){
+	public static function BuildAttackUnits($unit_list){
 		// {"amount":1,"_explicitType":"units.PlayerUnit","unit_id":1011}
 		$units = array();
 		foreach($unit_list as $unit_name => $quantity) {
-			$unit_struct[] = array("amount" => $quantity, 
+			if(!array_key_exists($unit_name, self::$unit_mapping)) {
+				die("ERROR: $unit_name does not exist in unit mapping\r\n");
+			}
+
+			$units[] = array("amount" => $quantity, 
 								   "_explicitType" => "units.PlayerUnit",
-								   "unit_id" => $this->unit_mapping[$unit_name]);
+								   "unit_id" => self::$unit_mapping[$unit_name]);
 		}
 
 		return $units;
-
 	}
 
-	public function sendCapture($target_player, $target_base, $target_building, $commander) {
+	private function sendGenericAttack($target_player, $target_base, $target_building, $commander, $units, $attack_type) {
+		$log_seq = 0;
+		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'SEND_GENERIC_ATTACK', $log_seq++, 'START', null, null);
+
+		$params = array();
+		$params['target_player_id'] = $target_player;
+		$params['target_base_id'] = $target_base;
+		$params['target_building_id'] = $target_building;
+		$params['commander_id'] = $commander;
+		$params['units_json'] = json_encode(self::BuildAttackUnits($units), true);
+		$params['attack_type'] = self::$attack_type_mapping[$attack_type];
+
+		$result_string = $this->de->MakeRequest('SEND_GENERIC_ATTACK', $params);
+		if(!$result_string) return false;
+
+		$result = json_decode($result_string, true);
+
+		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'SEND_GENERIC_ATTACK', $log_seq++, 'RESPONSE', null, print_r($result, true));
+
+		$success = $result['responses'][0]['return_value']['success'];
+
+		if($success != 1){
+			DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'SEND_GENERIC_ATTACK', $log_seq++, 'FAILED', $result['responses'][0]['return_value']['reason'], null);
+			echo "Failed to send capture.\r\n";
+			return false;
+		}
+
+		$army = $result['responses'][0]['return_value']['player_army'];
+
+		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'SEND_GENERIC_ATTACK', $log_seq++, 'COMPLETE', null, null);
+
+		return $army;
+	}
+
+	public function sendCapture($target_player, $target_base, $target_building, $commander, $units) {
 		//POST /hc//index.php/json_gateway?svc=BatchController.call HTTP/1.1
 		//x-newrelic-id: UgMDWFFADQYCUFFUBw==
 		//Accept: application/json
@@ -60,33 +100,15 @@ class GameOperations {
 		//1002: Railgun Tank
 
 		//[{"transaction_time":"$$transaction_time$$","platform":"$$device_platform$$","session_id":"$$session_id$$","start_sequence_num":1,"iphone_udid":"$$device_id$$","wd_player_id":0,"locale":"en-US","_explicitType":"Session","client_build":"$$client_build$$","game_name":"$$game_name$$","api_version":"$$api_version$$","mac_address":"$$mac_address$$","end_sequence_num":1,"req_id":1,"player_id":$$player_id$$,"language":"en","game_data_version":"$$game_data_version$$","client_version":"$$client_version$$"},[{"service":"army.army","method":"send_army_to_attack","_explicitType":"Command","params":[2,[{"amount":1,"_explicitType":"units.PlayerUnit","unit_id":1011},{"amount":50,"_explicitType":"units.PlayerUnit","unit_id":1003},{"amount":49,"_explicitType":"units.PlayerUnit","unit_id":1017},{"amount":850,"_explicitType":"units.PlayerUnit","unit_id":1004},{"amount":250,"_explicitType":"units.PlayerUnit","unit_id":1002}],"$$target_player_id$$",$$target_base_id$$,$$target_building_id$$,$$commander_id$$,0]}]]
+		//[{"amount":1,"_explicitType":"units.PlayerUnit","unit_id":1011},{"amount":50,"_explicitType":"units.PlayerUnit","unit_id":1003},{"amount":50,"_explicitType":"units.PlayerUnit","unit_id":1017},{"amount":849,"_explicitType":"units.PlayerUnit","unit_id":1004},{"amount":250,"_explicitType":"units.PlayerUnit","unit_id":1002}]
+
 		$log_seq = 0;
 		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'SEND_CAPTURE', $log_seq++, 'START', null, null);
 		
 		echo "Sending Capture...\r\n";
 
-		$params = array();
-		$params['target_player_id'] = $target_player;
-		$params['target_base_id'] = $target_base;
-		$params['target_building_id'] = $target_building;
-		$params['commander_id'] = $commander;
+		$army = $this->sendGenericAttack($target_player, $target_base, $target_building, $commander, $units, 'Capture');
 
-		$result_string = $this->de->MakeRequest('SEND_CAPTURE', $params);
-		if(!$result_string) return false;
-
-		$result = json_decode($result_string, true);
-
-		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'SEND_CAPTURE', $log_seq++, 'RESPONSE', null, print_r($result, true));
-
-		$success = $result['responses'][0]['return_value']['success'];
-
-		if($success != 1){
-			DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'SEND_CAPTURE', $log_seq++, 'FAILED', $result['responses'][0]['return_value']['reason'], null);
-			echo "Failed to send capture.\r\n";
-			return false;
-		}
-
-		$army = $result['responses'][0]['return_value']['player_army'];
 		$time_to_dest = $army['delta_time_to_destination'];
 		$army_id = $army['id'];
 
@@ -98,7 +120,7 @@ class GameOperations {
 		return $army;
 	}
 
-	public function sendAttack($target_player, $target_base, $target_building, $commander) {
+	public function sendAttack($target_player, $target_base, $target_building, $commander, $units) {
 		//[{"transaction_time":"$$transaction_time$$","platform":"$$device_platform$$","session_id":"$$session_id$$","start_sequence_num":1,"iphone_udid":"$$device_id$$","wd_player_id":0,"locale":"en-US","_explicitType":"Session","client_build":"$$client_build$$","game_name":"$$game_name$$","api_version":"$$api_version$$","mac_address":"$$mac_address$$","end_sequence_num":1,"req_id":1,"player_id":$$player_id$$,"language":"en","game_data_version":"$$game_data_version$$","client_version":"$$client_version$$"},[{"service":"army.army","method":"send_army_to_attack","_explicitType":"Command","params":[2,[{"amount":1,"_explicitType":"units.PlayerUnit","unit_id":1011}],"$$target_player_id$$",$$target_base_id$$,$$target_building_id$$,$$commander_id$$,1]}]]
 		//[{"transaction_time":"1431832773590","platform":"android","session_id":"1720258","start_sequence_num":1,"iphone_udid":"3934026952a3bb2473aee251bf29722b","wd_player_id":0,"locale":"en-US","_explicitType":"Session","client_build":"408","game_name":"HCGame","api_version":"1","mac_address":"14:10:9F:D6:7B:33","end_sequence_num":1,"req_id":1,"player_id":101013866213677,"language":"en","game_data_version":"hc_NA_20150515_52100","client_version":"2.0.2"},[{"service":"army.army","method":"send_army_to_attack","_explicitType":"Command","params":[2,[{"amount":1,"_explicitType":"units.PlayerUnit","unit_id":1011}],"101013100928452",1,1,430,1]
 	
@@ -107,28 +129,8 @@ class GameOperations {
 		
 		echo "Sending Attack...\r\n";
 
-		$params = array(); 
-		$params['target_player_id'] = $target_player;
-		$params['target_base_id'] = $target_base;
-		$params['target_building_id'] = $target_building;
-		$params['commander_id'] = $commander;
+		$army = $this->sendGenericAttack($target_player, $target_base, $target_building, $commander, $units, 'Attack');
 
-		$result_string = $this->de->MakeRequest('SEND_ATTACK', $params);
-		if(!$result_string) return false;
-
-		$result = json_decode($result_string, true);
-
-		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'SEND_ATTACK', $log_seq++, 'RESPONSE', null, print_r($result, true));
-
-		$success = $result['responses'][0]['return_value']['success'];
-
-		if($success != 1){
-			DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'SEND_ATTACK', $log_seq++, 'FAILED', $result['responses'][0]['return_value']['reason'], null);
-			echo "Failed to send attack.\r\n";
-			return false;
-		}
-
-		$army = $result['responses'][0]['return_value']['player_army'];
 		$time_to_dest = $army['delta_time_to_destination'];
 		$army_id = $army['id'];
 

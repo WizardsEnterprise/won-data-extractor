@@ -5,6 +5,7 @@ require_once('WarOfNationsAuthentication.class.php');
 require_once('WorldMapExtractor.class.php');
 require_once('LeaderboardExtractor.class.php');
 require_once('GameOperations.class.php');
+require_once('../PHPMailer/PHPMailerAutoload.php');
 
 class WarOfNations {
 	// Database
@@ -99,6 +100,65 @@ class WarOfNations {
 		$this->Authenticate();
 
 		return $this->map = new GameOperations($this->db, $this->de, $this->data_load_id, $this->auth);
+	}
+
+	function SendWarningText($message, $ringer = false, $debug = 0) {
+		// If we need to get the alert immediately, turn on the ringer
+		if($ringer)
+			$message = 'ringer on | '.$message;
+
+		$log_seq = 0;
+		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'SEND_WARNING_TEXT', $log_seq++, 'START', $message, null);
+
+		//Create a new PHPMailer instance
+		$mail = new PHPMailer;
+		//Tell PHPMailer to use SMTP
+		$mail->isSMTP();
+		//Enable SMTP debugging
+		// 0 = off (for production use)
+		// 1 = client messages
+		// 2 = client and server messages
+		$mail->SMTPDebug = $debug;
+		//Ask for HTML-friendly debug output
+		$mail->Debugoutput = 'html';
+		//Set the hostname of the mail server
+		$server = PgrmConfigDAO::getConfigProperties($this->db, 'SMTP', 'SERVER');
+		$mail->Host = $server['value1'];
+		//Set the SMTP port number - likely to be 25, 465 or 587
+		$mail->Port = $server['value2'];
+		//Whether to use SMTP authentication
+		$mail->SMTPAuth = true;
+		//Username to use for SMTP authentication
+		$credentials = PgrmConfigDAO::getConfigProperties($this->db, 'SMTP', 'CREDENTIALS');
+		$mail->Username = $credentials['value1'];
+		//Password to use for SMTP authentication
+		$mail->Password = $credentials['value2'];
+		//Set who the message is to be sent from
+		$from_email = PgrmConfigDAO::getConfigProperties($this->db, 'SMTP', 'FROM_EMAIL');
+		$mail->setFrom($from_email['value1'], $from_email['value2']);
+		//Set who the message is to be sent to
+		$text_to = PgrmConfigDAO::getConfigProperties($this->db, 'SMTP', 'WARNING_TEXT_TO');
+		$mail->addAddress($text_to['value1'], $text_to['value2']);
+		//Set the subject line
+		$mail->Subject = '';
+		//Set the body of the message
+		$mail->isHTML(false);
+		$mail->Body = $message;
+
+		//send the message, check for errors
+		if (!$mail->send()) {
+		    echo "Mailer Error: " . $mail->ErrorInfo . "\r\n";
+			DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'SEND_WARNING_TEXT', $log_seq++, 'SEND_ERROR', null, "Mailer Error: " . $mail->ErrorInfo, 1);
+
+		    return false;
+		} else {
+		    //echo "Message sent!";
+		    DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'SEND_WARNING_TEXT', $log_seq++, 'SEND_SUCCESSFUL', null, null);
+
+		    return true;
+		}
+
+		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'SEND_WARNING_TEXT', $log_seq++, 'COMPLETE', null, null);
 	}
 }
 
