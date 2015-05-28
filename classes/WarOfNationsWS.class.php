@@ -103,11 +103,11 @@ class WarOfNationsWS {
 		
 		// cleans up the curl request
 		curl_close($ch);
-		
-		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'MAKE_REQUEST', $log_seq++, 'REQUEST_COMPLETE', 'Time: '.($end - $start), null);
-		
 		$request_time = $end - $start;
-		echo "Request completed in ".$request_time." seconds\r\n";
+		
+		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'MAKE_REQUEST', $log_seq++, 'REQUEST_COMPLETE', 'Time: '.$request_time, null);
+		
+		//echo "Request completed in ".$request_time." seconds\r\n";
 		
 		// If our call failed
 		if(!$response_string) {

@@ -68,7 +68,7 @@ class GameOperations {
 		$success = $result['responses'][0]['return_value']['success'];
 
 		if($success != 1){
-			DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'SEND_GENERIC_ATTACK', $log_seq++, 'FAILED', $result['responses'][0]['return_value']['reason'], null);
+			DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'SEND_GENERIC_ATTACK', $log_seq++, 'FAILED', $result['responses'][0]['return_value']['reason'], null, 1);
 			echo "Failed to send capture.\r\n";
 			return false;
 		}
@@ -165,9 +165,10 @@ class GameOperations {
 		$success = $result['responses'][0]['return_value']['success'];
 
 		if($success != 1){
-			DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'RECALL_ARMY', $log_seq++, 'FAILED', $result['responses'][0]['return_value']['reason'], null);
+			$reason = $result['responses'][0]['return_value']['reason'];
+			DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'RECALL_ARMY', $log_seq++, 'FAILED', $reason, null);
 			echo "Failed to recall army.\r\n";
-			return false;
+			return $reason;
 		}
 
 		$army = $result['responses'][0]['return_value']['player_deployed_army'];
