@@ -19,35 +19,39 @@ $won->sendWarningText('Starting Commander Training!', false);
 
 // Initialize Settings
 $training_base_id = 2;
-$npc_id = '101013100928452';
+$npc_id = '101013110493867'; //'101013100928452';
 
 // Comms to train settings
-$comm_train_min_lvl = 80;
-$comm_train_max_lvl = 89;
+$comm_train_min_lvl = 90;
+$comm_train_max_lvl = 99;
 
-// Comm 348: Blister
-// Comm 349: Proton
-// Comm 350: Hyperion
-// Comm 351: Cinderblock
+/* 
+Commander IDs:
+ 207: Hellborn
+ 208: Iron Wing
+ 209: Fury Forge
+ 210: Dark Wolf
+ 211: The Guardian
 
-// Comm 207: Hellborn
-// Comm 208: Iron Wing
-// Comm 209: Fury Forge
-// Comm 210: Dark Wolf
-// Comm 211: The Guardian
+ 348: Blister
+ 349: Proton
+ 350: Hyperion
+ 351: Cinderblock
+*/
 $comms_to_train = array(207, 208, 209, 210, 211);
 
 // Comms to jeep settings
 $comm_jeep_max_lvl = 60;
 $num_jeeps = 8;
+$training_comm_min_energy = 0; // Drain them all the way and we can refill if needed
 $jeep_comm_min_energy = 1; // Keep 1 energy so that we can swap empty comms to another base
 $extra_comm_min_energy = 1; // Keep 1 energy just in case we need them for something
 
 // Unit settings
 $training_units_to_send = array('Jeep' => 1, 
 			   'Helicopter' => 50, 
-			   'Hailstorm' => 50, 
-			   'Artillery' => 849, //849
+			   'Hailstorm' => 10, 
+			   'Artillery' => 889, //849
 			   'Railgun Tank' => 250); //250
 
 $cap_hold_units_to_send = array('Artillery' => 1);
@@ -57,9 +61,9 @@ $jeep_units_to_send = array('Jeep' => 1);
 // Other operational/timing settings
 $minutes_before_jeep = 6;
 $seconds_before_second_cap = 10;
-$seconds_pause_between_jeeps = 10;
-$seconds_pause_before_recall = 15;
-$seconds_pause_between_rounds = 10;
+$seconds_pause_between_jeeps = 7;
+$seconds_pause_before_recall = 10;
+$seconds_pause_between_rounds = 5;
 
 // Authenticate ourselves
 //$auth_result = json_decode(file_get_contents('auth_result.json'), true);
@@ -71,6 +75,7 @@ $auth_result = $won->Authenticate(true);
 $game = $won->GetGameOperations();
 
 $log_seq = 0;
+$first = true;
 while(true){
 	// Sort commanders that are in the training base into groups
 	$training_commanders = array();
@@ -78,15 +83,16 @@ while(true){
 	$extra_jeep_commanders = array();
 	foreach($auth_result['responses'][0]['return_value']['player_commanders'] as $comm) {
 		// If the commander is in our designated training base and has energy
-		if($comm['town_id'] == $training_base_id && $comm['last_update_energy_value'] > $jeep_comm_min_energy) {
+		if($comm['town_id'] == $training_base_id && $comm['last_update_energy_value'] > 0) {
 			// Determine whether this commander is for training or jeeping
 			if(in_array($comm['commander_id'], $comms_to_train)) {
-				if($comm['level'] >= $comm_train_min_lvl && $comm['level'] <= $comm_train_max_lvl)
-					$training_commanders[] = $comm;
+				if($comm['last_update_energy_value'] > $training_comm_min_energy && 
+				   $comm['level'] >= $comm_train_min_lvl && $comm['level'] <= $comm_train_max_lvl)
+						$training_commanders[] = $comm;
 				elseif($comm['last_update_energy_value'] > $extra_comm_min_energy) // Never let our big comms run out of energy
 					$extra_jeep_commanders[] = $comm;
 			}
-			elseif($comm['level'] <= $comm_jeep_max_lvl)
+			elseif($comm['level'] <= $comm_jeep_max_lvl && $comm['last_update_energy_value'] > $jeep_comm_min_energy)
 				$jeeping_commanders[] = $comm;
 		}
 	}
@@ -96,7 +102,26 @@ while(true){
 
 	// We're out of commanders to train, we're done!  Stop now!
 	if(count($training_commanders) == 0 ) {
+		$won->sendWarningText('Out of commanders to train.  Qutting.');
 		echo date_format(new DateTime(), 'H:i:s')." | Out of commanders to train.  Qutting.\r\n";
+
+		// Before we quit, we need to recall the last cap army
+		$recall_army = $game->RecallArmy($last_cap_army['id']);
+
+		// If we failed to recall the cap, send an alert and quit the program
+		if(!is_array($recall_army)) {
+			// If the reason we failed was because the army was no longer in the base, attempt to continue
+			if($recall_army == "CAN'T_FIND_ARMY_TO_SEND_BACK_HOME") {
+				$won->sendWarningText("Cap Hold Army Recall Failed! Reason: $recall_army. Continuing...", false);
+				echo date_format(new DateTime(), 'H:i:s')." | Cap Hold Army Recall Failed! Reason: $recall_army.\r\n Attempting to continue...\r\n";
+				DataLoadLogDAO::logEvent($won->db, $won->data_load_id, 'TRAINING_COMMANDERS', $log_seq++, 'RECALL_FAILED', "Cap Hold Army Recall Failed! Reason: $recall_army", null, 1);
+			} else {
+				$won->sendWarningText('Cap Hold Army Recall Failed!', true);
+
+				echo date_format(new DateTime(), 'H:i:s')." | Cap Hold Army Recall Failed! Quitting.\r\n";
+			}
+		}
+
 		break;
 	}
 
@@ -118,6 +143,23 @@ while(true){
 		$won->sendWarningText('Initial Capture Failed!  Quitting Training.');
 
 		echo date_format(new DateTime(), 'H:i:s')." | Initial Capture Failed!  Quitting Training.\r\n";
+
+		// Before we quit, we need to recall the last cap army
+		$recall_army = $game->RecallArmy($last_cap_army['id']);
+
+		// If we failed to recall the cap, send an alert and quit the program
+		if(!is_array($recall_army)) {
+			// If the reason we failed was because the army was no longer in the base, attempt to continue
+			if($recall_army == "CAN'T_FIND_ARMY_TO_SEND_BACK_HOME") {
+				$won->sendWarningText("Cap Hold Army Recall Failed! Reason: $recall_army. Continuing...", false);
+				echo date_format(new DateTime(), 'H:i:s')." | Cap Hold Army Recall Failed! Reason: $recall_army.\r\n Attempting to continue...\r\n";
+				DataLoadLogDAO::logEvent($won->db, $won->data_load_id, 'TRAINING_COMMANDERS', $log_seq++, 'RECALL_FAILED', "Cap Hold Army Recall Failed! Reason: $recall_army", null, 1);
+			} else {
+				$won->sendWarningText('Cap Hold Army Recall Failed!', true);
+
+				echo date_format(new DateTime(), 'H:i:s')." | Cap Hold Army Recall Failed! Quitting.\r\n";
+			}
+		}
 		break;
 	}
 
@@ -125,7 +167,8 @@ while(true){
 	DataLoadDAO::operationComplete($won->db, $won->data_load_id);
 
 	// Wait a little bit before trying to send the second capture
-	usleep($seconds_before_second_cap * rand(1000000, 1200000));
+	$time_before_second_cap = $seconds_before_second_cap * rand(1000000, 1200000);
+	usleep($time_before_second_cap);
 
 	// Send a second capture so that we can recall the first immediately and avoid losing rails while in the base
 	// This one will stay in the base while we jeep and be recalled before the next training capture is sent
@@ -135,7 +178,7 @@ while(true){
 
 	// If we failed, send a text message, recall the original army, and quit.
 	if(!$cap_army) {
-		sendWarningText('Second Capture Failed!  Quitting Training.');
+		$won->sendWarningText('Second Capture Failed!  Quitting Training.');
 
 		// Now wait a little while longer before we recall just to seem human
 		usleep($seconds_pause_before_recall * rand(900000, 1100000));
@@ -152,8 +195,32 @@ while(true){
 		break;
 	}
 
+	// If this not the first wave, wait until just before our training cap will land and recall the holding cap
+	if(!$first){
+		// Pause until right before the training wave would hit.  Subtract the time we already waited.
+		usleep($training_army['delta_time_to_destination'] * rand(900000, 950000) - $time_before_second_cap);
+
+		echo date_format(new DateTime(), 'H:i:s')." | Recalling the cap hold army #{$cap_army['id']}\r\n";
+		$recall_army = $game->RecallArmy($last_cap_army['id']);
+
+		// If we failed to recall the cap, send an alert and quit the program
+		if(!is_array($recall_army)) {
+			// If the reason we failed was because the army was no longer in the base, attempt to continue
+			if($recall_army == "CAN'T_FIND_ARMY_TO_SEND_BACK_HOME") {
+				$won->sendWarningText("Cap Hold Army Recall Failed! Reason: $recall_army. Continuing...", false);
+				echo date_format(new DateTime(), 'H:i:s')." | Cap Hold Army Recall Failed! Reason: $recall_army.\r\n Attempting to continue...\r\n";
+				DataLoadLogDAO::logEvent($won->db, $won->data_load_id, 'TRAINING_COMMANDERS', $log_seq++, 'RECALL_FAILED', "Cap Hold Army Recall Failed! Reason: $recall_army", null, 1);
+			} else {
+				$won->sendWarningText('Cap Hold Army Recall Failed!', true);
+
+				echo date_format(new DateTime(), 'H:i:s')." | Cap Hold Army Recall Failed! Quitting.\r\n";
+				break;
+			}
+		}
+	} 
+
 	// Wait until our reinforcements arrive to recall the original training wave
-	usleep($cap_army['delta_time_to_destination'] * rand(1000000, 1200000));
+	usleep($cap_army['delta_time_to_destination'] * 1000000);
 	echo date_format(new DateTime(), 'H:i:s')." | Occupation has begun\r\n";
 
 	// Now wait a little while longer before we recall just to seem human
@@ -211,37 +278,46 @@ while(true){
 	usleep($jeep_army['delta_time_to_destination'] * rand(1000000, 1200000));
 
 	// Now wait a little while longer before we recall just to seem human
-	usleep($seconds_pause_before_recall * rand(900000, 1100000));
-
-	echo date_format(new DateTime(), 'H:i:s')." | Recalling the cap hold army\r\n";
-	$recall_army = $game->RecallArmy($cap_army['id']);
-
-	// If we failed to recall the cap, send an alert and quit the program
-	if(!is_array($recall_army)) {
-		// If the reason we failed was because the army was no longer in the base, attempt to continue
-		if($recall_army == "CAN'T_FIND_ARMY_TO_SEND_BACK_HOME") {
-			$won->sendWarningText("Cap Hold Army Recall Failed! Reason: $recall_army", false);
-			echo date_format(new DateTime(), 'H:i:s')." | Cap Hold Army Recall Failed! Reason: $recall_army\r\n";
-			DataLoadLogDAO::logEvent($won->db, $won->data_load_id, 'TRAINING_COMMANDERS', $log_seq++, 'RECALL_FAILED', "Cap Hold Army Recall Failed! Reason: $recall_army", null, 1);
-		} else {
-			$won->sendWarningText('Cap Hold Army Recall Failed!', true);
-
-			echo date_format(new DateTime(), 'H:i:s')." | Cap Hold Army Recall Failed! Quitting.\r\n";
-			break;
-		}
-	}
-
-	// Wait until our recalled capture wave has returned
-	// Changed after adding second round of captures
-	// - We no longer need to wait for it to come all the way back.  Take a short break and then send again
-	//usleep($recall_army['delta_time_to_destination'] * rand(1000000, 1200000));
-
-	// Pause for a little while because real humans don't take actions instantly
 	usleep($seconds_pause_between_rounds * rand(900000, 1100000));
+	
+	/*
+	I don't think we need this here at all.  Just need to NOT try to recall the army the first time 
+	coming through up above...
+
+	if($first) {
+		echo date_format(new DateTime(), 'H:i:s')." | Recalling the cap hold army #{$cap_army['id']}\r\n";
+		$recall_army = $game->RecallArmy($cap_army['id']);
+
+		// If we failed to recall the cap, send an alert and quit the program
+		if(!is_array($recall_army)) {
+			// If the reason we failed was because the army was no longer in the base, attempt to continue
+			if($recall_army == "CAN'T_FIND_ARMY_TO_SEND_BACK_HOME") {
+				$won->sendWarningText("Cap Hold Army Recall Failed! Reason: $recall_army. Continuing...", false);
+				echo date_format(new DateTime(), 'H:i:s')." | Cap Hold Army Recall Failed! Reason: $recall_army.\r\n Attempting to continue...\r\n";
+				DataLoadLogDAO::logEvent($won->db, $won->data_load_id, 'TRAINING_COMMANDERS', $log_seq++, 'RECALL_FAILED', "Cap Hold Army Recall Failed! Reason: $recall_army", null, 1);
+			} else {
+				$won->sendWarningText('Cap Hold Army Recall Failed!', true);
+
+				echo date_format(new DateTime(), 'H:i:s')." | Cap Hold Army Recall Failed! Quitting.\r\n";
+				break;
+			}
+		}
+
+		// Wait until our recalled capture wave has returned
+		// Changed after adding second round of captures
+		// - We no longer need to wait for it to come all the way back.  Take a short break and then send again
+		//usleep($recall_army['delta_time_to_destination'] * rand(1000000, 1200000));
+
+		// Pause for a little while because real humans don't take actions instantly
+		usleep($seconds_pause_between_rounds * rand(900000, 1100000));
+	}*/
+
+	// Need to save this information so that we can recall it next time around
+	$last_cap_army = $cap_army;
 
 	// Re-Sync our player data so that we can use this to decide which commanders to use next round
 	$auth_result = $game->SyncPlayer();
-
+	$first = false;
 }
 
 DataLoadDAO::loadComplete($won->db, $won->data_load_id);

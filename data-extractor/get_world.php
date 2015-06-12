@@ -19,7 +19,7 @@ $count = 0;
 $status = true;
 
 // Change this to exclude any areas of the map that normally result in "out of bounds" errors.
-// Recommended setting for detailed scanning: 1350
+// Recommended setting for detailed scanning: 1400
 $min_radius = 0;
 
 
@@ -95,7 +95,7 @@ while($cur_quadrant <= 3) {
 
 $end = microtime(true);
 
-echo "$count calls to map service in ".($end - $start)." seconds.<br/>\r\n";
+echo "$count calls to map service in ".($end - $start)." seconds.\r\n";
 
 DataLoadDAO::loadComplete($won->db, $won->data_load_id);
 
