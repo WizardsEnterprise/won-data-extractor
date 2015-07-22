@@ -287,7 +287,7 @@ class WarOfNationsAuthentication {
 		*/
 
 		$log_seq = 0;
-		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'SWITCH_WORLD', $log_seq++, 'START', "Attempting to join World $world_id", null);
+		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'SWITCH_WORLD', $log_seq++, 'START', "Attempting to switch to World $world_id", null);
 
 
 		$params = array();
@@ -295,7 +295,7 @@ class WarOfNationsAuthentication {
 
 		$response = json_decode($this->de->MakeRequest('SWITCH_WORLD', $params), true);
 
-		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'SWITCH_WORLD', $log_seq++, 'RESPONSE', $log_msg, print_r($response, true));
+		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'SWITCH_WORLD', $log_seq++, 'RESPONSE', null, print_r($response, true));
 
 		$this->world_id = $world_id;
 		$this->player_id = $response['metadata']['player']['player_id'];

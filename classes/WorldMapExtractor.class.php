@@ -155,6 +155,8 @@ class WorldMapExtractor {
 				$game_player_id = $hex->player_id;
 			else if(isset($hex->npc_player_id))
 				$game_player_id = $hex->npc_player_id;
+			else
+				$game_player_id = null;
 			
 			// Get the local Player ID from our database
 			$player_id = PlayerDAO::getLocalIdFromGameId($this->db, $game_player_id);

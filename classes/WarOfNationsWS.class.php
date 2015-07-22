@@ -11,7 +11,8 @@ class WarOfNationsWS {
 	
 	// List of proxy servers to use for connections.
 	private $proxies;
-	private static $max_retries = -1;
+	private static $max_retries = 10;
+	private static $min_retry_delay = 3;
 	
 	// Base Configuration
 	private $url_base;
@@ -46,9 +47,10 @@ class WarOfNationsWS {
 	
 	private function init_request($url, $proxy = false) {
 		// If we're using a proxy server for this request, set the curl options
+		$ch = curl_init($url);         
+
 		if($proxy !== false) {
 			$proxy_str = "{$proxy['ip_address']}:{$proxy['port']}";
-			$ch = curl_init($url);         
 			curl_setopt($ch, CURLOPT_PROXY, $proxy_str);
 			
 			if($proxy['type'] == 'SOCKS') // If this is a SOCKS proxy, set the type - HTTP is the default
@@ -77,15 +79,23 @@ class WarOfNationsWS {
 		$log_msg = "Attempt #".($retry_count + 1)."\r\n\r\n".$data_string;
 		$log_seq = 0;
 		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'MAKE_REQUEST', $log_seq++, 'START', $endpoint, $log_msg);
-			
+		
 		if($retry_count > 0)
 			echo "Retry Attempt #$retry_count<br/>\r\n";
+
+		if($retry_count >= self::$min_retry_delay && self::$min_retry_delay > 0) {
+			$waittime = ($retry_count - self::$min_retry_delay + 1) * 5;
+			echo "Waiting $waittime seconds before retry.";
+			DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'MAKE_REQUEST', $log_seq++, 'DELAY', "Waiting $waittime seconds before retry.", $log_msg);
+			usleep($waittime * 1000000);
+		}
 		
 		// Assemble our URL
 		$url = $this->url_base.$endpoint;
 		
 		// Initialize our Curl request
 		$headers = $this->get_headers($endpoint, $data_string);
+		$proxy = false;
 		if($this->proxies != false)
 			$proxy = $this->proxies[array_rand($this->proxies)];
 		

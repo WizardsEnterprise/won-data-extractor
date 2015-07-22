@@ -78,6 +78,7 @@ class LeaderboardExtractor {
 		$log_seq = 0;
 		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'SAVE_PLAYER_LEADERBOARD', $log_seq++, 'START', null, null);
 		
+		$count = 0;
 		foreach($leader_data as $key => $leader) {
 			$player = new Player();
 			$player->world_id = $this->auth->world_id;

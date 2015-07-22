@@ -41,7 +41,11 @@ class ModelBase {
 		
 		foreach ($array as $key => $value)
 		{	
+			if(!array_key_exists($key, $db_mapping))
+				continue;
+			
 			$obj_key = $db_mapping[$key];
+
 			if(property_exists($obj, $obj_key)) {
 				$obj->$obj_key = $value;
 			}

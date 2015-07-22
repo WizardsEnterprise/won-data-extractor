@@ -81,7 +81,7 @@ class Guild extends ModelBase {
 	public $id;
 	public $world_id;
 	public $game_guild_id;
-	public $owner_id;
+	public $leader_id;
 	public $guild_name;
 	public $battle_points;
 	public $members;
