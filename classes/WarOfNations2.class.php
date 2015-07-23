@@ -105,7 +105,7 @@ class WarOfNations {
 	function SendWarningText($message, $ringer = false, $debug = 0) {
 		// If we need to get the alert immediately, turn on the ringer
 		if($ringer)
-			$message = 'ringer on | '.$message;
+			$message = PgrmConfigDAO::getConfigProperty($this->db, 'SMTP', 'SERVER', 'value1').' | '.$message;
 
 		$log_seq = 0;
 		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'SEND_WARNING_TEXT', $log_seq++, 'START', $message, null);

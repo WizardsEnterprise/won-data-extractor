@@ -14,6 +14,17 @@ $first = true;
 $cap_army = array('id' => 15); // Use this when start_with_jeeps == true
 $last_cap_army = array('id' => 17); // Use this when first == false
 
+//$current = strtotime('2015-07-23 04:57:54');
+//$training_landing_time = 1437645510;
+//$training_landing_time->setTimezone(new DateTimeZone('America/Chicago'));
+
+//echo "$current\r\n";
+//echo "$training_landing_time\r\n";
+
+//echo $training_landing_time - $current;
+
+//die();
+
 // Wait for commanders to arrive
 // usleep(3 * 60 * 1000000);
 
@@ -63,11 +74,11 @@ Commander IDs:
  405: Bayonet
  406: Char?
 */
-$comms_to_train = array(400);
+$comms_to_train = array(400, 401, 402);
 
 // Comms to train settings
-$comm_train_min_lvl = 50;
-$comm_train_max_lvl = 74;
+$comm_train_min_lvl = 75;
+$comm_train_max_lvl = 94;
 
 // Comms to jeep settings
 $comm_jeep_max_lvl = 70;
@@ -80,7 +91,6 @@ $jeep_increment = 0; // Don't touch this
 // Comms to hold base settings
 $comm_hold_min_lvl = 90;
 $comm_hold_min_energy = 1;
-
 
 // Unit settings
 $training_units_to_send = array('Jeep' => 1, 
@@ -296,9 +306,9 @@ while(true){
 		$time_before_training_landing = $training_army['delta_time_to_destination'] * 1000000 - $time_before_second_cap;
 
 		// If this is not the first wave, wait until just before our training wave will land and recall the holding cap
-		if(!$first || $start_with_jeeps){
+		if(!$first){
 			// Pause until right before the training wave would hit. Sorry for ugly math.
-			$time_before_recall_hold = $time_before_training_landing / 1000000 * rand(800000, 900000);
+			$time_before_recall_hold = $time_before_training_landing - 10 * rand(800000, 1000000);
 			usleep($time_before_recall_hold);
 
 			// Adjust the time before the training wave lands for time we just waited
