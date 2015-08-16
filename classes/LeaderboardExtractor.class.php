@@ -122,7 +122,7 @@ class LeaderboardExtractor {
 			$guild->world_id = $this->auth->world_id;
 			$guild->data_load_id = $this->data_load_id;
 			$guild->game_guild_id = $leader['guild_id'];
-			if($leader_id = PlayerDAO::getLocalIdFromGameId($this->db, $leader['owner_id']))
+			if(array_key_exists('owner_id', $leader) && $leader_id = PlayerDAO::getLocalIdFromGameId($this->db, $leader['owner_id']))
 				$guild->leader_id = $leader_id;
 			$guild->guild_name = $leader['guild_name'];
 			$guild->battle_points = $leader['score'];

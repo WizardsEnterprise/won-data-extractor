@@ -14,7 +14,13 @@ class GameOperations {
 	private $auth;
 
 	// Unit Mapping
-	private static $unit_mapping = array('Jeep' => 1011, 'Helicopter' => 1003, 'Hailstorm' => 1017, 'Artillery' => 1004, 'Railgun Tank' => 1002);
+	private static $unit_mapping = array('Jeep' => 1011, 
+										 'Helicopter' => 1003, 
+										 'Hailstorm' => 1017, 
+										 'Artillery' => 1004, 
+										 'Railgun Tank' => 1002,
+										 'Transport' => 1008,
+										 'Bomber' => 1010);
 	
 	// Attack Type Mapping
 	private static $attack_type_mapping = array('Capture' => 0, 'Attack' => 1);
@@ -69,7 +75,7 @@ class GameOperations {
 
 		if($success != 1){
 			DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'SEND_GENERIC_ATTACK', $log_seq++, 'FAILED', $result['responses'][0]['return_value']['reason'], null, 1);
-			echo "Failed to send capture.\r\n";
+			echo "Failed to send generic attack.\r\n";
 			return false;
 		}
 

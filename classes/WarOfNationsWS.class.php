@@ -81,11 +81,11 @@ class WarOfNationsWS {
 		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'MAKE_REQUEST', $log_seq++, 'START', $endpoint, $log_msg);
 		
 		if($retry_count > 0)
-			echo "Retry Attempt #$retry_count<br/>\r\n";
+			echo "Retry Attempt #$retry_count\r\n";
 
 		if($retry_count >= self::$min_retry_delay && self::$min_retry_delay > 0) {
 			$waittime = ($retry_count - self::$min_retry_delay + 1) * 5;
-			echo "Waiting $waittime seconds before retry.";
+			echo "Waiting $waittime seconds before retry.\r\n";
 			DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'MAKE_REQUEST', $log_seq++, 'DELAY', "Waiting $waittime seconds before retry.", $log_msg);
 			usleep($waittime * 1000000);
 		}
@@ -110,6 +110,9 @@ class WarOfNationsWS {
 		$start = microtime(true);
 		$response_string = curl_exec($ch);
 		$end = microtime(true);
+
+		if(!$response_string)
+			$curl_error = curl_error($ch);
 		
 		// cleans up the curl request
 		curl_close($ch);
@@ -121,7 +124,7 @@ class WarOfNationsWS {
 		
 		// If our call failed
 		if(!$response_string) {
-			$log_msg = "Proxy: {$proxy['ip_address']}:{$proxy['port']}<br/>\r\nURL: $url<br/>\r\nData: $data_string<br/>\r\n";
+			$log_msg = "Error Description: $curl_error\r\n\r\nProxy: {$proxy['ip_address']}:{$proxy['port']}<br/>\r\nURL: $url<br/>\r\nData: $data_string<br/>\r\n";
 			DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'MAKE_REQUEST', $log_seq++, 'ERROR_CURL_RESPONSE', 'Error occurred during curl request', $log_msg, 1);
 			
 			echo "Error occurred while getting Curl response.\r\n";

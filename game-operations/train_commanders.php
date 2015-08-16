@@ -11,8 +11,8 @@ $start_with_jeeps = false;
 $first = true;
 
 // What was the cap hold army ID to be recalled? This is a hack!
-$cap_army = array('id' => 15); // Use this when start_with_jeeps == true
-$last_cap_army = array('id' => 17); // Use this when first == false
+$cap_army = array('id' => 42); // Use this when start_with_jeeps == true
+$last_cap_army = array('id' => 42); // Use this when first == false
 
 //$current = strtotime('2015-07-23 04:57:54');
 //$training_landing_time = 1437645510;
@@ -25,8 +25,8 @@ $last_cap_army = array('id' => 17); // Use this when first == false
 
 //die();
 
-// Wait for commanders to arrive
-// usleep(3 * 60 * 1000000);
+// Pause before starting
+//usleep(45 * 60 * 1000000);
 
 // TODO: Build something so that I can control this remotely
 // TODO: If we run out of commanders to jeep with, make the program wait some time and then try to start again
@@ -44,10 +44,11 @@ $won->sendWarningText('Starting Commander Training!', false);
 // Initialize Settings
 $training_base_id = 2;
 
+// Banner 38: 101013177372837
 // Zion 38: 101013171988840
 // HQ 38: 101013100928452
 // My 34: 101013101930604
-$npc_id = '101013101930604'; 
+$npc_id = '101013177372837'; 
 
 /* 
 Commander IDs:
@@ -69,19 +70,19 @@ Commander IDs:
  401: Athena
  402: Apollo
 
- 403: Adama?
+ 403: Adama
  404: Big Blue
  405: Bayonet
- 406: Char?
+ 406: Char
 */
-$comms_to_train = array(400, 401, 402);
+$comms_to_train = array(403, 404, 405, 406);
 
 // Comms to train settings
-$comm_train_min_lvl = 75;
-$comm_train_max_lvl = 94;
+$comm_train_min_lvl = 90;
+$comm_train_max_lvl = 99;
 
 // Comms to jeep settings
-$comm_jeep_max_lvl = 70;
+$comm_jeep_max_lvl = 80;
 $num_jeeps = 8;
 $training_comm_min_energy = 0; // Drain them all the way and we can refill if needed
 $jeep_comm_min_energy = 1; // Keep 1 energy so that we can swap empty comms to another base
@@ -94,10 +95,12 @@ $comm_hold_min_energy = 1;
 
 // Unit settings
 $training_units_to_send = array('Jeep' => 1, 
-			   'Helicopter' => 25, // 25 for 34, 50 for 38
-			   'Hailstorm' => 10, // 10 for 34, 25 for 38
-			   'Artillery' => 914, // 914 for 34, 874 for 38
-			   'Railgun Tank' => 250);
+			   'Helicopter' => 50, // 25 for 34, 50 for 38
+			   'Hailstorm' => 25, // 10 for 34, 25 for 38
+			   'Artillery' => 872, // 914 for 34, 872 for 38
+			   'Railgun Tank' => 250,
+			   'Transport' => 1,
+			   'Bomber' => 1);
 
 // This gets used when we have strong comms to hold the base with
 $strong_cap_hold_units_to_send = array('Jeep' => 1, 
@@ -138,6 +141,7 @@ $auth_result = $won->Authenticate(true);
 // Get an instance of our game operations class
 $game = $won->GetGameOperations();
 
+$quitting = false;
 $log_seq = 0;
 while(true){
 	// Sort commanders that are in the training base into groups
@@ -149,12 +153,15 @@ while(true){
 		// If the commander is in our designated training base and has energy
 		if(array_key_exists('town_id', $comm) && $comm['town_id'] == $training_base_id && $comm['last_update_energy_value'] > 0) {
 			// Determine whether this commander is for training or jeeping
-			if(in_array($comm['commander_id'], $comms_to_train) || count($comms_to_train) == 0) {
+			if(in_array($comm['commander_id'], $comms_to_train) || 
+				(count($comms_to_train) == 0 && $comm['max_bonus_points'] == 10000)) {
 				if($comm['last_update_energy_value'] > $training_comm_min_energy && 
 				   $comm['level'] >= $comm_train_min_lvl && $comm['level'] <= $comm_train_max_lvl)
 						$training_commanders[] = $comm;
-				elseif($comm['last_update_energy_value'] > $extra_comm_min_energy) // Never let our big comms run out of energy
-					$extra_jeep_commanders[] = $comm;
+				elseif($comm['level'] >= $comm_hold_min_lvl && $comm['last_update_energy_value'] > $comm_hold_min_energy)
+					$holding_commanders[] = $comm;
+				elseif($comm['last_update_energy_value'] > $extra_comm_min_energy)
+					$extra_commanders[] = $comm;
 			}
 			elseif($comm['level'] <= $comm_jeep_max_lvl && $comm['last_update_energy_value'] > $jeep_comm_min_energy)
 				$jeeping_commanders[] = $comm;
@@ -165,6 +172,14 @@ while(true){
 
 	// Merge our jeeping commanders together with our "extra" commanders (ones already trained or too low level) 
 	$jeeping_commanders = array_merge($jeeping_commanders, $extra_jeep_commanders);
+
+	DataLoadLogDAO::logEvent($won->db, $won->data_load_id, 'TRAIN_COMMANDERS', $log_seq++, 'TRAINING_COMMANDERS', 'Number Remaining: '.count($training_commanders), print_r($training_commanders, true));
+	DataLoadLogDAO::logEvent($won->db, $won->data_load_id, 'TRAIN_COMMANDERS', $log_seq++, 'HOLDING_COMMANDERS', 'Number Remaining: '.count($holding_commanders), print_r($holding_commanders, true));
+	DataLoadLogDAO::logEvent($won->db, $won->data_load_id, 'TRAIN_COMMANDERS', $log_seq++, 'JEEPING_COMMANDERS', 'Number Remaining: '.count($jeeping_commanders), print_r($jeeping_commanders, true));
+
+	echo "Commanders left to train: ".count($training_commanders)."\r\n";
+	echo "Commanders left to hold: ".count($holding_commanders)."\r\n";
+	echo "Commanders left to jeep: ".count($jeeping_commanders)."\r\n";
 
 	// We're out of commanders to train, we're done!  Stop now!
 	if(count($training_commanders) == 0 ) {
@@ -196,14 +211,6 @@ while(true){
 		break;
 	}
 
-	DataLoadLogDAO::logEvent($won->db, $won->data_load_id, 'TRAIN_COMMANDERS', $log_seq++, 'TRAINING_COMMANDERS', 'Number Remaining: '.count($training_commanders), print_r($training_commanders, true));
-	DataLoadLogDAO::logEvent($won->db, $won->data_load_id, 'TRAIN_COMMANDERS', $log_seq++, 'HOLDING_COMMANDERS', 'Number Remaining: '.count($holding_commanders), print_r($holding_commanders, true));
-	DataLoadLogDAO::logEvent($won->db, $won->data_load_id, 'TRAIN_COMMANDERS', $log_seq++, 'JEEPING_COMMANDERS', 'Number Remaining: '.count($jeeping_commanders), print_r($jeeping_commanders, true));
-
-	echo "Commanders left to train: ".count($training_commanders)."\r\n";
-	echo "Commanders left to hold: ".count($holding_commanders)."\r\n";
-	echo "Commanders left to jeep: ".count($jeeping_commanders)."\r\n";
-
 	// If we just need to start with the jeep step, skip to there
 	if(!($start_with_jeeps && $first)) {
 		// Select the commander to train
@@ -213,10 +220,6 @@ while(true){
 		// TODO: Figure out a way to get commander names
 		echo date_format(new DateTime(), 'H:i:s')." | Sending training wave for commander: {$current_training_comm['id']}, level {$current_training_comm['level']}\r\n";
 		$training_army = $game->SendCapture($npc_id, 1, 1, $current_training_comm['id'], $training_units_to_send);
-
-		$training_landing_time = new DateTime("@{$training_army['time_to_destination_ts']}");
-		$training_landing_time->setTimezone(new DateTimeZone('America/Chicago'));
-		echo "Training wave arrives at ".date_format($training_landing_time, 'H:i:s'."\r\n");
 
 		// If we failed, send a text message and quit.
 		if(!$training_army) {
@@ -248,6 +251,13 @@ while(true){
 
 			break;
 		}
+
+		/*
+		Don't need this because the time is innacurate anyway!
+
+		$training_landing_time = new DateTime("@{$training_army['time_to_destination_ts']}");
+		$training_landing_time->setTimezone(new DateTimeZone('America/Chicago'));
+		echo "Training wave arrives at ".date_format($training_landing_time, 'H:i:s'."\r\n");*/
 
 		// Log 1 training attack on the NPC as a completed operation
 		DataLoadDAO::operationComplete($won->db, $won->data_load_id);
@@ -297,12 +307,34 @@ while(true){
 				}
 			}
 
+			// If this isn't the first wave, we need to recall the cap holding army
+			if(!$first) {
+				// Before we quit, we need to recall the last cap army
+				$recall_army = $game->RecallArmy($last_cap_army['id']);
+
+				// If we failed to recall the cap, send an alert and quit the program
+				if(!is_array($recall_army)) {
+					echo date_format(new DateTime(), 'H:i:s')." | Cap Hold Army Recall Failed! Reason: $recall_army.\r\n";
+					DataLoadLogDAO::logEvent($won->db, $won->data_load_id, 'TRAINING_COMMANDERS', $log_seq++, 'RECALL_FAILED', "Cap Hold Army Recall Failed! Reason: $recall_army", null, 1);
+
+					// If the reason we failed was because the army was no longer in the base, attempt to continue
+					if($recall_army == "CAN'T_FIND_ARMY_TO_SEND_BACK_HOME") {
+						// Ignore this error, the army is not in the base but we're quitting anyway so we don't care
+					} else {
+						// We failed to recall and we don't know why.  Sound the alarm!
+						$won->sendWarningText("Cap Hold Army Recall Failed! Reason: $recall_army. Quitting.", true);
+
+						echo "Quitting.\r\n";
+					}
+				}
+			}
+
 			echo date_format(new DateTime(), 'H:i:s')." | Second Capture Failed!  Quitting Training.\r\n";
 
 			break;
 		}
 
-		// Calculate how much longer before out training wave will land
+		// Calculate how much longer before our training wave will land
 		$time_before_training_landing = $training_army['delta_time_to_destination'] * 1000000 - $time_before_second_cap;
 
 		// If this is not the first wave, wait until just before our training wave will land and recall the holding cap
@@ -315,7 +347,7 @@ while(true){
 			$time_before_training_landing = $time_before_training_landing - $time_before_recall_hold;
 			
 			// Verify that the next army hasn't already landed.  If it did, we're in trouble...
-			$current_time = new DateTime();
+			/*$current_time = new DateTime();
 			if($current_time > $training_landing_time) {
 				// The current training wave has already landed, there are extra waves in the base.
 				// Send an alert and try to recall everything.  In a future version, try to make this recoverable.
@@ -325,7 +357,7 @@ while(true){
 				DataLoadLogDAO::logEvent($won->db, $won->data_load_id, 'TRAINING_COMMANDERS', $log_seq++, 'RECALL_FAILED', "Did not recall cap army before the training wave landed.", null, 1);
 
 				break;
-			}
+			}*/
 
 			echo date_format(new DateTime(), 'H:i:s')." | Recalling the cap hold army #{$last_cap_army['id']}\r\n";
 			$recall_army = $game->RecallArmy($last_cap_army['id']);

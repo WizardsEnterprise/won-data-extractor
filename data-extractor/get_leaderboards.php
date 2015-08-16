@@ -31,7 +31,7 @@ $won->Authenticate();
 echo "Getting Top $top_x_players Player Leaderboards\r\n";
 $start = 0;
 while($start < $top_x_players) {
-	echo "Getting Player Leaderboard $start - ".($start + $interval)."<br/>\r\n";
+	echo "Getting Player Leaderboard $start - ".($start + $interval)."\r\n";
 	DataLoadDAO::operationComplete($won->db, $won->data_load_id);
 	$won->GetLeaderboard(1, $start);
 	$start += $interval;
@@ -46,7 +46,7 @@ DataLoadDAO::startLoad($won->db, $won->data_load_id);
 echo "\r\nGetting Top $top_x_alliances Alliance Leaderboards\r\n";
 $start = 0;
 while($start < $top_x_alliances) {
-	echo "Getting Alliance Leaderboard $start - ".($start + $interval)."<br/>\r\n";
+	echo "Getting Alliance Leaderboard $start - ".($start + $interval)."\r\n";
 	DataLoadDAO::operationComplete($won->db, $won->data_load_id);
 	$won->GetLeaderboard(2, $start);
 	$start += $interval;
