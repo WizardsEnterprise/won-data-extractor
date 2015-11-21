@@ -4,7 +4,7 @@ require_once('../classes/data/DataLoad.class.php');
 
 $radius = 1472;
 $r2 = pow($radius, 2);
-$interval = 95; // Normal: 95
+$interval = 100; // Normal: 95
 $scan_size = 100; // Normal: 100
 $r2_offset = pow($radius + $interval, 2) - $r2;
 

@@ -232,7 +232,7 @@ class WorldMapExtractor {
 					}
 				}
 			} else if ($player->player_name){
-				$updateCount = PlayerDAO::updatePlayer($this->db, $player, array('battle_points', 'bases'));
+				$updateCount = PlayerDAO::updatePlayer($this->db, $player, array('battle_points', 'glory_points', 'bases'));
 				if($this->db->hasError()) {
 					echo 'Error updating Player: ';
 					print_r($this->db->getError());

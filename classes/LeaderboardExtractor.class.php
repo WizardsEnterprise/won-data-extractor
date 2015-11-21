@@ -86,6 +86,7 @@ class LeaderboardExtractor {
 			$player->game_player_id = $leader['player_id'];
 			$player->player_name = $leader['player_name'];
 			$player->battle_points = $leader['score'];
+			$player->glory_points = $leader['glory_points'];
 			$player->level = $leader['level'];
 			$player->bases = $leader['bases'];
 			

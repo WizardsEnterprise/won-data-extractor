@@ -80,6 +80,9 @@ class PlayerDAO {
 		
 		if(!in_array('battle_points', $customExcludes) && $p1->battle_points != $p2->battle_points)
 			return true;
+
+		if(!in_array('glory_points', $customExcludes) && $p1->glory_points != $p2->glory_points)
+			return true;
 			
 		if(!in_array('guild_id', $customExcludes) && $p1->guild_id != $p2->guild_id)
 			return true;
@@ -97,7 +100,8 @@ class PlayerDAO {
 class PlayerMapper {
 	public static $mapping = array('id' => 'id', 'world_id' => 'world_id', 'game_player_id' => 'game_player_id',
 								   'player_name' => 'player_name', 'level' => 'level', 'battle_points' => 'battle_points', 
-								   'bases' => 'bases', 'guild_id' => 'guild_id', 'data_load_id' => 'data_load_id');
+								   'bases' => 'bases', 'guild_id' => 'guild_id', 'data_load_id' => 'data_load_id',
+								   'glory_points' => 'glory_points');
 								
 	public static $excludeFromInsert = array('id');
 	public static $excludeFromUpdate = array('id', 'world_id', 'game_player_id');
@@ -119,6 +123,7 @@ class Player extends ModelBase {
 	public $game_player_id;
 	public $player_name;
 	public $battle_points;
+	public $glory_points;
 	public $level;
 	public $bases;
 	public $guild_id;

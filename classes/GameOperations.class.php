@@ -212,6 +212,41 @@ class GameOperations {
 		return $result;
 	}
 
+	public function SubscribeUplink() {
+		//[{"transaction_time":"1448131541333","platform":"android","session_id":"6867564","start_sequence_num":0,"iphone_udid":"8c9c72c38515837f4957843075bcac39","wd_player_id":0,"locale":"en-US","_explicitType":"Session","client_build":"486","game_name":"HCGame","api_version":"1","mac_address":"14:10:9F:D6:7B:33","end_sequence_num":0,"req_id":1,"player_id":101013624609676,"language":"en","client_version":"2.5.2"},[{"service":"uplinkservice.uplinkservice","method":"subscribe","_explicitType":"Command","params":[]}]]
+		//[{"transaction_time":"$$transaction_time$$","platform":"$$device_platform$$","session_id":"$$session_id$$","start_sequence_num":1,"iphone_udid":"$$device_id$$","wd_player_id":0,"locale":"en-US","_explicitType":"Session","client_build":"$$client_build$$","game_name":"$$game_name$$","api_version":"$$api_version$$","mac_address":"$$mac_address$$","end_sequence_num":0,"req_id":1,"player_id":$$player_id$$,"language":"en","game_data_version":"$$game_data_version$$","client_version":"$$client_version$$"},[{"service":"uplinkservice.uplinkservice","method":"subscribe","_explicitType":"Command","params":[]}]]
+	
+		$log_seq = 0;
+		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'SUBSCRIBE_UPLINK', $log_seq++, 'START', null, null);
+		
+		echo "Subscribing...\r\n";
+
+		$result_string = $this->de->MakeRequest('SUBSCRIBE_UPLINK');
+		if(!$result_string) return false;
+
+		$result = json_decode($result_string, true);
+
+		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'SUBSCRIBE_UPLINK', $log_seq++, 'RESPONSE', null, print_r($result, true));
+
+		if($result['status'] == 'OK') {
+			echo "Subscribed!\r\n";
+
+			DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'SUBSCRIBE_UPLINK', $log_seq++, 'COMPLETE', "Subscribed to Uplink Service", null);
+
+			return $result['uplink_info'];
+		} else {
+			echo "Failed to Subscribe!\r\n";
+
+			DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'SUBSCRIBE_UPLINK', $log_seq++, 'FAILED', "Failed to Subscribe to Uplink Service", null);
+
+			return false;
+
+		}
+
+
+
+	}
+
 }
 
 
