@@ -233,7 +233,7 @@ class GameOperations {
 
 			DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'SUBSCRIBE_UPLINK', $log_seq++, 'COMPLETE', "Subscribed to Uplink Service", null);
 
-			return $result['uplink_info'];
+			return $result['responses'][0]['return_value']['uplink_info'];
 		} else {
 			echo "Failed to Subscribe!\r\n";
 
@@ -242,8 +242,6 @@ class GameOperations {
 			return false;
 
 		}
-
-
 
 	}
 
