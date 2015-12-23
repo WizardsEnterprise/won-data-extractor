@@ -38,7 +38,7 @@ class WorldMapExtractor {
 	}
 	
 	// Call the web service to get the world map and then parse and save it in the database
-	public function GetWorldMap($x_start = 0, $y_start = 0, $x_range = 50, $y_range = 50) {
+	public function GetWorldMap($x_start = 0, $y_start = 0, $x_range = 100, $y_range = 100) {
 		/*
 		POST /hc//index.php/json_gateway?svc=BatchController.call HTTP/1.1
 		Accept: application/json
@@ -55,9 +55,13 @@ class WorldMapExtractor {
 		*/
 		
 		$log_seq = 0;
-		$descriptor = "World: {$this->auth->world_id}, X: $x_start, Y: $y_start, X_RANGE: $x_range, Y_RANGE: $y_range";
-		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'GET_WORLD_MAP', $log_seq++, 'START', $descriptor, null);
-		
+		$descriptor = "World: {$this->auth->world_id}\r\n(Map Coordinates)\r\nX: $x_start, Y: $y_start \r\n(Range)\r\nX_RANGE: $x_range, Y_RANGE: $y_range";
+		$func_args = func_get_args();
+		$func_log_id = DataLoadLogDAO::startFunction($this->db, $this->data_load_id, __CLASS__,  __FUNCTION__, $func_args);
+
+		DataLoadLogDAO::logEvent2($this->db, $func_log_id, $log_seq++, 'INFO', $descriptor);
+
+
 		echo "Getting World Map...\r\n";
 		
 		$x_start = self::convertFromMapCoordinate($x_start, $y_start);
@@ -68,54 +72,40 @@ class WorldMapExtractor {
 		$params['y_range'] = $y_range;
 		//$data_string = '[{"transaction_time":"'.$transaction_time.'","platform":"'.$device_platform.'","session_id":"'.$session_id.'","start_sequence_num":1,"iphone_udid":"'.$device_id.'","wd_player_id":0,"locale":"en-US","_explicitType":"Session","client_build":"'.Constants::$client_build.'","game_name":"'.Constants::$game_name.'","api_version":"'.Constants::$api_version.'","mac_address":"'.$mac_address.'","end_sequence_num":1,"req_id":1,"player_id":'.$player_id.',"language":"en","game_data_version":"'.Constants::$game_data_version.'","client_version":"'.Constants::$client_version.'"},[{"service":"world.world","method":"get_map_data","_explicitType":"Command","params":[[['.$x_start.','.$y_start.','.$x_range.','.$y_range.']]]}]]';
 		
+		DataLoadLogDAO::logEvent2($this->db, $func_log_id, $log_seq++, 'DEBUG', "Converted Database Coordinates X: $x_start, Y: $y_start");
+
 		$retry_count = 0;
 		
-		// We'll try this 3 times in case the request comes back with no information
-		while($retry_count < 3) {
-			if($retry_count > 0)
-				DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'GET_WORLD_MAP', $log_seq++, 'RETRYING', "Retry #$retry_count", null, 0);
-			
-			// If we get a response but can't decode it, we retry infinitely... that's probably not the best solution	
-			while(true) {
-				$result_string = $this->de->MakeRequest('GET_MAP_DATA', $params);
-				if(!$result_string) return false;
-		
-				$result = json_decode($result_string, true);
-				if($result == null) {
-					DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'GET_WORLD_MAP', $log_seq++, 'JSON_DECODE_FAILED', null, $result_string, 1);
-				
-					echo "Error: Failed to decode JSON string: $result_string\r\n";
-					continue;
-				}
-				break;
-			}
-		
-			DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'GET_WORLD_MAP', $log_seq++, 'RESPONSE', null, print_r($result, true));
+		$result = $this->de->MakeRequest('GET_MAP_DATA', $params);
+		if(!$result) return false;
 
-			// This will return false if there's no useable data in the response and we'll try again
-			$status = $this->ParseAndSaveWorldMap($result, $descriptor);
-			if($status === true)
-				break;
-			else
-				$retry_count++;
+		$result = json_decode($result_string, true);
+		if($result === false) {
+			DataLoadLogDAO::completeFunction($this->db, $func_log_id, 'Error getting map data.  See ws request log.', 1);
+			return false;
 		}
 		
-		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'GET_WORLD_MAP', $log_seq++, 'COMPLETE', $descriptor, null);
+		// This will return false if there's no useable data in the response and we'll try again
+		$status = $this->ParseAndSaveWorldMap($result, $descriptor);
 		
+		DataLoadLogDAO::completeFunction($this->db, $func_log_id, 'Map Extracted Successfully');
 		return true;
 	}
 	
 	public function ParseAndSaveWorldMap($world_response, $descriptor) {
 		$log_seq = 0;
-		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'PARSE_SAVE_WORLD_MAP', $log_seq++, 'START', $descriptor, null);
-		
+		$func_args = func_get_args();
+		$func_args[0] = 'Removed Hex Array. See WS Request Log.';
+		$func_log_id = DataLoadLogDAO::startFunction($this->db, $this->data_load_id, __CLASS__,  __FUNCTION__, $func_args);
+
+		DataLoadLogDAO::logEvent2($this->db, $func_log_id, $log_seq++, 'INFO', $descriptor);
+
 		// Get the Hexes section of the world response
 		$success = $world_response['responses'][0]['return_value']['success'];
 		
 		if($success != 1) {
-			$reason = $world_response['responses'][0]['return_value']['reason'];
-			DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'PARSE_SAVE_WORLD_MAP', $log_seq++, 'GET_MAP_DATA_ERROR', $reason, $descriptor, 1);
-			
+			$reason = $world_response['responses'][0]['return_value']['reason'];			
+			DataLoadLogDAO::completeFunction($this->db, $func_log_id, "Error Getting Map Data: $reason", 1);
 			// Even though this is technically a failure, we return true because we don't want to retry this request
 			return true;
 		}
@@ -125,7 +115,8 @@ class WorldMapExtractor {
 		
 		// Sometimes this happens but I'm not sure why... so I created a return code to try again...
 		if(empty($world)) {
-			DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'PARSE_SAVE_WORLD_MAP', $log_seq++, 'NO_HEXES_FOUND', $descriptor, null, 1);
+			DataLoadLogDAO::completeFunction($this->db, $func_log_id, 'No Hexes Found', 1);
+
 			echo "No hexes found.\r\n";
 			return false;
 		}
@@ -178,6 +169,8 @@ class WorldMapExtractor {
 			
 			// If this is a town tile then we have additional information, so let's process it
 			if(isset($hex->town_name) || in_array($hex->building_id, array(14))) {
+				$hex->command_center = true;
+
 				// Set base properties
 				$hex->is_sb = ($hex->town_radius == 2 and $hex->building_id == 1) ? 1 : 0;
 				$hex->is_npc = $hex->town_name === 'Renegade Outpost' ? 1 : 0;
@@ -207,8 +200,8 @@ class WorldMapExtractor {
 						if($this->db->hasError()) {
 							echo 'Error inserting Guild: ';
 							print_r($this->db->getError());
-							$log_msg = var_export($guild, true)."\r\n\r\n".print_r($this->db->getError(), true);
-							DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'PARSE_SAVE_WORLD_MAP', $log_seq++, 'ERROR_INSERTING_GUILD', "World: {$guild->world_id}, Guild: {$guild->guild_name}", $log_msg, 1);
+							$log_msg = print_r($guild, true)."\r\n\r\n".print_r($this->db->getError(), true);
+							DataLoadLogDAO::logEvent2($this->db, $func_log_id, $log_seq++, 'ERROR', "Error inserting Guild [{$guild->guild_name}] into World [{$guild->world_id}]", $log_msg, 1);
 							echo "\r\n";
 						}
 					}
@@ -220,6 +213,8 @@ class WorldMapExtractor {
 			// If this player didn't already exist in our database, create it.  Otherwise, update it.
 			if(!$player_id) {
 				if($game_player_id) {
+					//DataLoadLogDAO::logEvent2($this->db, $func_log_id, $log_seq++, 'DEBUG', "Inserting Player [{$player->player_name}] into World [{$player->world_id}]", var_export($player, true));
+
 					$player_id = PlayerDAO::insertPlayer($this->db, $player);
 					
 					if($this->db->hasError()) {
@@ -227,19 +222,24 @@ class WorldMapExtractor {
 						print_r($this->db->getError());
 						echo "\r\n";
 						
-						$log_msg = var_export($player, true)."\r\n\r\n".print_r($this->db->getError(), true);
-						DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'PARSE_SAVE_WORLD_MAP', $log_seq++, 'ERROR_INSERTING_PLAYER', "World: {$player->world_id}, Player: {$player->player_name}", $log_msg, 1);	
+						$log_msg = print_r($player, true)."\r\n\r\n".print_r($this->db->getError(), true);
+						DataLoadLogDAO::logEvent2($this->db, $func_log_id, $log_seq++, 'ERROR', "Error inserting Player [{$player->player_name}] into World [{$player->world_id}]", $log_msg, 1);
+
 					}
 				}
 			} else if ($player->player_name){
+				//DataLoadLogDAO::logEvent2($this->db, $func_log_id, $log_seq++, 'DEBUG', "Updating Player [{$player->player_name}] in World [{$player->world_id}]", var_export($player, true));
+
+				// Update the player, but exclude battle points, power, and the number of bases because these aren't available in this case
 				$updateCount = PlayerDAO::updatePlayer($this->db, $player, array('battle_points', 'glory_points', 'bases'));
+				
 				if($this->db->hasError()) {
 					echo 'Error updating Player: ';
 					print_r($this->db->getError());
 					echo "\r\n";
 					
 					$log_msg = var_export($player, true)."\r\n\r\n".print_r($this->db->getError(), true);
-					DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'PARSE_SAVE_WORLD_MAP', $log_seq++, 'ERROR_UPDATING_PLAYER', "World: {$player->world_id}, Player: {$player->player_name}", $log_msg, 1);
+					DataLoadLogDAO::logEvent2($this->db, $func_log_id, $log_seq++, 'ERROR', "Error updating Player [{$player->player_name}] in World [{$player->world_id}]", $log_msg, 1);
 				}
 			}
 			
@@ -256,8 +256,8 @@ class WorldMapExtractor {
 					echo "\r\n";
 					
 					$log_msg = var_export($hex, true)."\r\n\r\n".print_r($this->db->getError(), true);
-					DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'PARSE_SAVE_WORLD_MAP', $log_seq++, 'ERROR_INSERTING_HEX', "World: {$hex->world_id}, X: {$hex->hex_x}, Y: {$hex->hex_y}", $log_msg, 1);
-					
+					DataLoadLogDAO::logEvent2($this->db, $func_log_id, $log_seq++, 'ERROR', "Error inserting hex into World {$hex->world_id}, X: {$hex->hex_x}, Y: {$hex->hex_y}", $log_msg);
+
 				}
 			} else {
 				$hex_id = WorldMapDAO::updateHex($this->db, $hex);
@@ -267,12 +267,14 @@ class WorldMapExtractor {
 					echo "\r\n";
 					
 					$log_msg = var_export($hex, true)."\r\n\r\n".print_r($this->db->getError(), true);
-					DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'PARSE_SAVE_WORLD_MAP', $log_seq++, 'ERROR_UPDATING_HEX', "World: {$hex->world_id}, X: {$hex->hex_x}, Y: {$hex->hex_y}", $log_msg, 1);
+					DataLoadLogDAO::logEvent2($this->db, $func_log_id, $log_seq++, 'ERROR', "Error updating hex in World {$hex->world_id}, X: {$hex->hex_x}, Y: {$hex->hex_y}", $log_msg, 1);
+
 				}
 			}
 		}
 		
-		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'PARSE_SAVE_WORLD_MAP', $log_seq++, 'COMPLETE', "Created $hex_count Hexes", $descriptor);
+		DataLoadLogDAO::completeFunction($this->db, $func_log_id, "Created $hex_count Hexes");
+
 		echo "Created $hex_count Hexes\r\n";
 		return true;
 	}

@@ -49,8 +49,9 @@ class LeaderboardExtractor {
 		*/
 		
 		$log_seq = 0;
-		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'GET_LEADERBOARD', $log_seq++, 'START', "Board ID: $leaderboard_id, Start Index: $start_index", null);
-		
+		$func_args = func_get_args();
+		$func_log_id = DataLoadLogDAO::startFunction($this->db, $this->data_load_id, __CLASS__,  __FUNCTION__, $func_args);
+
 		//$data_string = '[{"transaction_time":"'.$transaction_time.'","platform":"'.$device_platform.'","session_id":"'.$session_id.'","start_sequence_num":1,"iphone_udid":"'.$device_id.'","wd_player_id":0,"locale":"en-US","_explicitType":"Session","client_build":"'.Constants::$client_build.'","game_name":"'.Constants::$game_name.'","api_version":"'.Constants::$api_version.'","mac_address":"'.$mac_address.'","end_sequence_num":1,"req_id":1,"player_id":'.$player_id.',"language":"en","game_data_version":"'.Constants::$game_data_version.'","client_version":"'.Constants::$client_version.'"},[{"service":"leaderboard.leaderboard","method":"get_leaderboard_info","_explicitType":"Command","params":['.$leaderboard_id.','.$start_index.',null]}]]';
 		
 		echo "Getting Leaderboards...\r\n";
@@ -58,11 +59,10 @@ class LeaderboardExtractor {
 		$params['leaderboard_id'] = $leaderboard_id;
 		$params['start_index'] = $start_index;
 		
-		$result_string = $this->de->MakeRequest('GET_LEADERBOARD_DATA', $params);
-		$result = json_decode($result_string, true);
+		$result = $this->de->MakeRequest('GET_LEADERBOARD_DATA', $params);
+		if(!$result) return false;
+
 		echo "Done!\r\n";
-		
-		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'GET_LEADERBOARD', $log_seq++, 'RESPONSE', null, print_r($result, true));
 		
 		$leaderboard = $result['responses'][0]['return_value']['leaderboard_info']['leaderboard'];
 		
@@ -71,13 +71,16 @@ class LeaderboardExtractor {
 		else if($leaderboard_id == 2)
 			$this->SaveGuildLeaderboard($leaderboard);
 			
-		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'GET_LEADERBOARD', $log_seq++, 'COMPLETE', null, null);
+		DataLoadLogDAO::completeFunction($this->db, $func_log_id, "Successfully Got Leaderboard");
+
 	}
 	
 	function SavePlayerLeaderboard($leader_data) {
 		$log_seq = 0;
-		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'SAVE_PLAYER_LEADERBOARD', $log_seq++, 'START', null, null);
-		
+		$func_args = func_get_args();
+		$func_args[0] = 'Removed Hex Array. See WS Request Log.';
+		$func_log_id = DataLoadLogDAO::startFunction($this->db, $this->data_load_id, __CLASS__,  __FUNCTION__, $func_args);
+
 		$count = 0;
 		foreach($leader_data as $key => $leader) {
 			$player = new Player();
@@ -102,21 +105,23 @@ class LeaderboardExtractor {
 				print_r($this->db->getError());
 				echo "\r\n";
 				
-				$log_msg = var_dump($player)."\r\n\r\n".print_r($this->db->getError(), true);
-				DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'SAVE_PLAYER_LEADERBOARD', $log_seq++, 'ERROR_SAVING_PLAYER', "World: {$player->world_id}, Player: {$player->player_name}", $log_msg, 1);
+				$log_msg = print_r($player, true)."\r\n\r\n".print_r($this->db->getError(), true);
+				DataLoadLogDAO::logEvent2($this->db, $func_log_id, $log_seq++, 'ERROR', "Error Saving Player: World [{$player->world_id}], Player: [{$player->player_name}]", $log_msg, 1);	
+
 			} else {
 				$count++;
 			}
 		}
 		
-		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'SAVE_PLAYER_LEADERBOARD', $log_seq++, 'COMPLETE', "Saved $count Players", null);
-		
+		DataLoadLogDAO::completeFunction($this->db, $func_log_id, "Saved $count Players");
 	}
 		
 	function SaveGuildLeaderboard($leader_data) {
 		$log_seq = 0;
-		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'SAVE_GUILD_LEADERBOARD', $log_seq++, 'START', null, null);
-		
+		$func_args = func_get_args();
+		$func_args[0] = 'Removed Hex Array. See WS Request Log.';
+		$func_log_id = DataLoadLogDAO::startFunction($this->db, $this->data_load_id, __CLASS__,  __FUNCTION__, $func_args);
+
 		$count = 0;
 		foreach($leader_data as $key => $leader) {
 			$guild = new Guild();
@@ -142,14 +147,14 @@ class LeaderboardExtractor {
 				echo "\r\n";
 				
 				$log_msg = var_dump($player)."\r\n\r\n".print_r($this->db->getError(), true);
-				DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'SAVE_GUILD_LEADERBOARD', $log_seq++, 'ERROR_SAVING_GUILD', "World: {$player->world_id}, Guild: {$guild->guild_name}", $log_msg, 1);
+				DataLoadLogDAO::logEvent2($this->db, $func_log_id, $log_seq++, 'ERROR', "Error Saving Guild: World [{$guild->world_id}], Guild: [{$guild->guild_name}]", $log_msg, 1);	
+
 			} else {
 				$count++;
 			}
 		}
 		
-		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'SAVE_GUILD_LEADERBOARD', $log_seq++, 'COMPLETE', "Saved $count Guilds", null);
-		
+		DataLoadLogDAO::completeFunction($this->db, $func_log_id, "Saved $count Guilds");
 	}
 }
 ?>

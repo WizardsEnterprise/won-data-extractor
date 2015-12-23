@@ -2,6 +2,7 @@
 require_once('../classes/WarOfNations2.class.php');
 require_once('../classes/data/DataLoad.class.php');
 
+
 require('../vendor/autoload.php');
 
 use WebSocket\Client;
@@ -14,10 +15,10 @@ $won->setDataLoadId(DataLoadDAO::initNewLoad($won->db, 'SUBSCRIBE_SERVICE', 0));
 DataLoadDAO::startLoad($won->db, $won->data_load_id);
 
 // Get an instance of our game operations class
-$game = $won->GetGameOperations();
+//$game = $won->GetGameOperations();
 
 // Subscribe
-$uplink_info = $game->SubscribeUplink();
+//$uplink_info = $game->SubscribeUplink();
 
 /*
 GET /websocket HTTP/1.1
@@ -37,6 +38,7 @@ sec-websocket-key: SGU5W1MmMmIzcWtkMzYxVQ==
 sec-websocket-version: 13
 */
 
+/*
 $socket_addr = "ws://{$uplink_info['stream']['hostname']}:{$uplink_info['stream']['port']}/websocket";
 echo "Connecting to $socket_addr... ";
 
@@ -66,6 +68,12 @@ while(true){
 	echo "Sending: $msg\r\n";
 	$client->send($msg);
 }
+*/
 
+$uplink = $won->GetUplinkService();
+
+$uplink->Subscribe();
+
+$uplink->Run();
 
 ?>

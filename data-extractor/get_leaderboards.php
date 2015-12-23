@@ -36,7 +36,7 @@ while($start < $top_x_players) {
 	$won->GetLeaderboard(1, $start);
 	$start += $interval;
 }
-echo "Done!<br/>\r\n";
+echo "Done!\r\n";
 
 DataLoadDAO::loadComplete($won->db, $won->data_load_id);
 
@@ -51,7 +51,7 @@ while($start < $top_x_alliances) {
 	$won->GetLeaderboard(2, $start);
 	$start += $interval;
 }
-echo "Done!<br/>\r\n";
+echo "Done!\r\n";
 
 DataLoadDAO::loadComplete($won->db, $won->data_load_id);
 

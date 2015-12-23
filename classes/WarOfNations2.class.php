@@ -5,6 +5,7 @@ require_once('WarOfNationsAuthentication.class.php');
 require_once('WorldMapExtractor.class.php');
 require_once('LeaderboardExtractor.class.php');
 require_once('GameOperations.class.php');
+require_once('UplinkService.class.php');
 require_once('../PHPMailer/PHPMailerAutoload.php');
 
 class WarOfNations {
@@ -21,10 +22,15 @@ class WarOfNations {
 	public $auth = false;
 	public $map = false;
 	public $leaders = false;
+	public $gameops = false;
+	public $uplink = false;
 	
 	function __construct() {
 		$this->db = DatabaseFactory::getDatabase();
 		$this->de = new WarOfNationsDataExtractor($this->db);
+
+		// We always need authentication, so just initialize it now
+		$this->auth = new WarOfNationsAuthentication($this->db, $this->de, $this->data_load_id);
 	}
 	
 	function setDataLoadId($dlid) {
@@ -39,16 +45,22 @@ class WarOfNations {
 			
 		if ($this->leaders !== false)
 			$this->leaders->setDataLoadId($dlid);
+
+		if ($this->gameops !== false)
+			$this->gameops->setDataLoadId($dlid);
+
+		if ($this->uplink !== false)
+			$this->uplink->setDataLoadId($dlid);
 	}
-	
-	function Authenticate($return_full_response = false) {
+
+	function Authenticate($new = false, $device_id = false, $return_full_response = false) {
 		// If the authentication object hasn't been initialized yet, initialize it
 		if ($this->auth === false)
 			$this->auth = new WarOfNationsAuthentication($this->db, $this->de, $this->data_load_id);
 		
 		// If we aren't already authenticated, authenticate ourselves now
 		if (!$this->auth->authenticated)
-			return $this->auth->Authenticate(false, $return_full_response);
+			return $this->auth->Authenticate($new, $device_id, $return_full_response);
 		return true;
 	}
 	
@@ -99,7 +111,19 @@ class WarOfNations {
 	function GetGameOperations() {
 		$this->Authenticate();
 
-		return $this->map = new GameOperations($this->db, $this->de, $this->data_load_id, $this->auth);
+		if ($this->gameops === false)
+			return $this->gameops = new GameOperations($this->db, $this->de, $this->data_load_id, $this->auth);
+	
+		return $this->gameops;
+	}
+
+	function GetUplinkService() {
+		$this->Authenticate();
+
+		if ($this->uplink === false)
+			return $this->uplink = new UplinkService($this->db, $this->de, $this->data_load_id, $this->auth);
+
+		return $this->uplink;
 	}
 
 	function SendWarningText($message, $ringer = false, $debug = 0) {
@@ -108,7 +132,8 @@ class WarOfNations {
 			$message = PgrmConfigDAO::getConfigProperty($this->db, 'SMTP', 'SERVER', 'value1').' | '.$message;
 
 		$log_seq = 0;
-		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'SEND_WARNING_TEXT', $log_seq++, 'START', $message, null);
+		$func_args = func_get_args();
+		$func_log_id = DataLoadLogDAO::startFunction($this->db, $this->data_load_id, __CLASS__,  __FUNCTION__, $func_args);
 
 		//Create a new PHPMailer instance
 		$mail = new PHPMailer;
@@ -148,17 +173,16 @@ class WarOfNations {
 		//send the message, check for errors
 		if (!$mail->send()) {
 		    echo "Mailer Error: " . $mail->ErrorInfo . "\r\n";
-			DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'SEND_WARNING_TEXT', $log_seq++, 'SEND_ERROR', null, "Mailer Error: " . $mail->ErrorInfo, 1);
+			DataLoadLogDAO::logEvent2($this->db, $func_log_id, $log_seq++, 'ERROR', 'Error Sending Message', $mail->ErrorInfo, 1);	
+
+			DataLoadLogDAO::completeFunction($this->db, $func_log_id, 'Error Sending Message', 1);
 
 		    return false;
 		} else {
 		    //echo "Message sent!";
-		    DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'SEND_WARNING_TEXT', $log_seq++, 'SEND_SUCCESSFUL', null, null);
-
+		    DataLoadLogDAO::completeFunction($this->db, $func_log_id, 'Message Sent');
 		    return true;
 		}
-
-		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'SEND_WARNING_TEXT', $log_seq++, 'COMPLETE', null, null);
 	}
 }
 

@@ -131,7 +131,6 @@ $total_recall_failures = 0;
 $time_before_second_cap = 0;
 $time_before_recall_hold = 0;
 
-
 // Authenticate ourselves
 //$auth_result = json_decode(file_get_contents('auth_result.json'), true);
 $auth_result = $won->Authenticate(true); 
@@ -140,6 +139,8 @@ $auth_result = $won->Authenticate(true);
 
 // Get an instance of our game operations class
 $game = $won->GetGameOperations();
+
+$func_log_id = DataLoadLogDAO::startFunction($won->db, $won->data_load_id, 'TrainCommanders', 'Main');
 
 $quitting = false;
 $log_seq = 0;
@@ -173,9 +174,9 @@ while(true){
 	// Merge our jeeping commanders together with our "extra" commanders (ones already trained or too low level) 
 	$jeeping_commanders = array_merge($jeeping_commanders, $extra_jeep_commanders);
 
-	DataLoadLogDAO::logEvent($won->db, $won->data_load_id, 'TRAIN_COMMANDERS', $log_seq++, 'TRAINING_COMMANDERS', 'Number Remaining: '.count($training_commanders), print_r($training_commanders, true));
-	DataLoadLogDAO::logEvent($won->db, $won->data_load_id, 'TRAIN_COMMANDERS', $log_seq++, 'HOLDING_COMMANDERS', 'Number Remaining: '.count($holding_commanders), print_r($holding_commanders, true));
-	DataLoadLogDAO::logEvent($won->db, $won->data_load_id, 'TRAIN_COMMANDERS', $log_seq++, 'JEEPING_COMMANDERS', 'Number Remaining: '.count($jeeping_commanders), print_r($jeeping_commanders, true));
+	DataLoadLogDAO::logEvent2($won->db, $func_log_id, $log_seq++, 'INFO', 'Training Commanders: ['.count($training_commanders).'] Remaining', print_r($training_commanders, true));	
+	DataLoadLogDAO::logEvent2($won->db, $func_log_id, $log_seq++, 'INFO', 'Holding Commanders: ['.count($holding_commanders).'] Remaining', print_r($holding_commanders, true));	
+	DataLoadLogDAO::logEvent2($won->db, $func_log_id, $log_seq++, 'INFO', 'Jeeping Commanders: ['.count($jeeping_commanders).'] Remaining', print_r($jeeping_commanders, true));	
 
 	echo "Commanders left to train: ".count($training_commanders)."\r\n";
 	echo "Commanders left to hold: ".count($holding_commanders)."\r\n";
@@ -194,7 +195,7 @@ while(true){
 			// If we failed to recall the cap, send an alert and quit the program
 			if(!is_array($recall_army)) {
 				echo date_format(new DateTime(), 'H:i:s')." | Cap Hold Army Recall Failed! Reason: $recall_army.\r\n";
-				DataLoadLogDAO::logEvent($won->db, $won->data_load_id, 'TRAINING_COMMANDERS', $log_seq++, 'RECALL_FAILED', "Cap Hold Army Recall Failed! Reason: $recall_army", null, 1);
+				DataLoadLogDAO::logEvent2($won->db, $func_log_id, $log_seq++, 'ERROR', "Cap Hold Army Recall Failed! Reason: $recall_army", null, 1);	
 
 				// If the reason we failed was because the army was no longer in the base, attempt to continue
 				if($recall_army == "CAN'T_FIND_ARMY_TO_SEND_BACK_HOME") {
@@ -235,7 +236,7 @@ while(true){
 				// If we failed to recall the cap, send an alert and quit the program
 				if(!is_array($recall_army)) {
 					echo date_format(new DateTime(), 'H:i:s')." | Cap Hold Army Recall Failed! Reason: $recall_army.\r\n";
-					DataLoadLogDAO::logEvent($won->db, $won->data_load_id, 'TRAINING_COMMANDERS', $log_seq++, 'RECALL_FAILED', "Cap Hold Army Recall Failed! Reason: $recall_army", null, 1);
+					DataLoadLogDAO::logEvent2($won->db, $func_log_id, $log_seq++, 'ERROR', "Cap Hold Army Recall Failed! Reason: $recall_army", null, 1);	
 
 					// If the reason we failed was because the army was no longer in the base, attempt to continue
 					if($recall_army == "CAN'T_FIND_ARMY_TO_SEND_BACK_HOME") {
@@ -294,7 +295,7 @@ while(true){
 			// If we failed to recall the cap, send an alert and quit the program
 			if(!is_array($recall_army)) {
 				echo date_format(new DateTime(), 'H:i:s')." | Training Army Recall Failed! Reason: $recall_army.\r\n";
-				DataLoadLogDAO::logEvent($won->db, $won->data_load_id, 'TRAINING_COMMANDERS', $log_seq++, 'RECALL_FAILED', "Cap Hold Army Recall Failed! Reason: $recall_army", null, 1);
+				DataLoadLogDAO::logEvent2($won->db, $func_log_id, $log_seq++, 'ERROR', "Training Army Recall Failed! Reason: $recall_army", null, 1);	
 
 				// If the reason we failed was because the army was no longer in the base, attempt to continue
 				if($recall_army == "CAN'T_FIND_ARMY_TO_SEND_BACK_HOME") {
@@ -315,7 +316,7 @@ while(true){
 				// If we failed to recall the cap, send an alert and quit the program
 				if(!is_array($recall_army)) {
 					echo date_format(new DateTime(), 'H:i:s')." | Cap Hold Army Recall Failed! Reason: $recall_army.\r\n";
-					DataLoadLogDAO::logEvent($won->db, $won->data_load_id, 'TRAINING_COMMANDERS', $log_seq++, 'RECALL_FAILED', "Cap Hold Army Recall Failed! Reason: $recall_army", null, 1);
+					DataLoadLogDAO::logEvent2($won->db, $func_log_id, $log_seq++, 'ERROR', "Cap Hold Army Recall Failed! Reason: $recall_army", null, 1);	
 
 					// If the reason we failed was because the army was no longer in the base, attempt to continue
 					if($recall_army == "CAN'T_FIND_ARMY_TO_SEND_BACK_HOME") {
@@ -365,7 +366,7 @@ while(true){
 			// If we failed to recall the cap, send an alert and quit the program
 			if(!is_array($recall_army)) {
 				echo date_format(new DateTime(), 'H:i:s')." | Cap Hold Army Recall Failed! Reason: $recall_army.\r\n";
-				DataLoadLogDAO::logEvent($won->db, $won->data_load_id, 'TRAINING_COMMANDERS', $log_seq++, 'RECALL_FAILED', "Cap Hold Army Recall Failed! Reason: $recall_army", null, 1);
+				DataLoadLogDAO::logEvent2($won->db, $func_log_id, $log_seq++, 'ERROR', "Cap Hold Army Recall Failed! Reason: $recall_army", null, 1);	
 
 				// Count
 				$recall_fails_in_a_row = $recall_fails_in_a_row + 1;
@@ -424,7 +425,7 @@ while(true){
 			// If we failed to recall the cap, send an alert and quit the program
 			if(!is_array($recall_army)) {
 				echo date_format(new DateTime(), 'H:i:s')." | Cap Hold Army Recall Failed! Reason: $recall_army.\r\n";
-				DataLoadLogDAO::logEvent($won->db, $won->data_load_id, 'TRAINING_COMMANDERS', $log_seq++, 'RECALL_FAILED', "Cap Hold Army Recall Failed! Reason: $recall_army", null, 1);
+				DataLoadLogDAO::logEvent2($won->db, $func_log_id, $log_seq++, 'ERROR', "Cap Hold Army Recall Failed! Reason: $recall_army", null, 1);	
 
 				// If the reason we failed was because the army was no longer in the base, attempt to continue
 				if($recall_army == "CAN'T_FIND_ARMY_TO_SEND_BACK_HOME") {
@@ -452,7 +453,7 @@ while(true){
 			// If we failed to recall the cap, send an alert and quit the program
 			if(!is_array($recall_army)) {
 				echo date_format(new DateTime(), 'H:i:s')." | Cap Hold Army Recall Failed! Reason: $recall_army.\r\n";
-				DataLoadLogDAO::logEvent($won->db, $won->data_load_id, 'TRAINING_COMMANDERS', $log_seq++, 'RECALL_FAILED', "Cap Hold Army Recall Failed! Reason: $recall_army", null, 1);
+				DataLoadLogDAO::logEvent2($won->db, $func_log_id, $log_seq++, 'ERROR', "Cap Hold Army Recall Failed! Reason: $recall_army", null, 1);	
 
 				// If the reason we failed was because the army was no longer in the base, attempt to continue
 				if($recall_army == "CAN'T_FIND_ARMY_TO_SEND_BACK_HOME") {
@@ -504,5 +505,6 @@ while(true){
 	$first = false;
 }
 
+DataLoadLogDAO::completeFunction($this->db, $func_log_id, 'Done Training');
 DataLoadDAO::loadComplete($won->db, $won->data_load_id);
 ?>

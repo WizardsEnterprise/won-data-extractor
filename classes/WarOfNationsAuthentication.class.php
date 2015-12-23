@@ -16,6 +16,7 @@ class WarOfNationsAuthentication {
 	public $data_load_id;
 	
 	// Device info
+	private $local_device_id;
 	public $device_id;
 	public $mac_address;
 	public $device_platform;
@@ -45,7 +46,7 @@ class WarOfNationsAuthentication {
 	}
 	
 	private static function generate_device_id() {
-		return md5('this is a fake 3');
+		return md5('this is a fake '.mt_rand(1000000,9999999));
 	}
 	
 	private static function generate_mac_address() {
@@ -53,7 +54,7 @@ class WarOfNationsAuthentication {
 	}
 	
 	// Authenticate a device into the game
-	public function Authenticate($new = false, $return_full_response = false) {
+	public function Authenticate($new = false, $device_id = false, $return_full_response = false) {
 		/*
 		POST /hc//index.php/json_gateway?svc=BatchController.authenticate_iphone HTTP/1.1
 		Accept: application/json
@@ -70,12 +71,23 @@ class WarOfNationsAuthentication {
 		*/
 	
 		$log_seq = 0;
-		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'AUTHENTICATE', $log_seq++, 'START', null, null);
-	
+		$func_args = func_get_args();
+		$func_log_id = DataLoadLogDAO::startFunction($this->db, $this->data_load_id, __CLASS__,  __FUNCTION__, $func_args);
+
+		// If we've previously been authenticated, don't re-authenticate as a different account
+		if($this->authenticated && $new === false && $device_id === false) {
+			$new = false;
+			$device_id = $this->local_device_id;
+		}
+
 		// If we're not making a new device, then get the active device from our database
 		if(!$new) {
-			$device = DeviceDAO::getActiveDevice($this->db);
+			if(!($device_id === false))
+				$device = DeviceDAO::getDeviceById($this->db, $device_id);
+			else
+				$device = DeviceDAO::getActiveDevice($this->db);
 			
+			$this->local_device_id = $device['id'];
 			$this->device_id = $device['device_uuid'];
 			$this->mac_address = $device['mac_address'];
 			$this->device_platform = $device['platform'];
@@ -83,7 +95,7 @@ class WarOfNationsAuthentication {
 			$this->device_type = $device['device_type'];
 			$this->use_proxy = $device['use_proxy'];
 		} else {
-			DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'AUTHENTICATE', $log_seq++, 'CREATING_NEW_DEVICE', null, null);
+			DataLoadLogDAO::logEvent2($this->db, $func_log_id, $log_seq++, 'INFO', 'Creating New Device');
 		
 			$this->device_id = self::generate_device_id();
 			$this->mac_address = self::generate_mac_address();
@@ -105,12 +117,13 @@ class WarOfNationsAuthentication {
 		$this->de->AddCacheParam('session_id', self::generate_session_id());
 	
 		$log_msg = "Device ID: {$this->device_id}\r\nMAC Address: {$this->mac_address}\r\nDevice Platform: {$this->device_platform}\r\nDevice Version: {$this->device_version}\r\nDevice Type: {$this->device_type}";
-		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'AUTHENTICATE', $log_seq++, 'DEVICE_INFO', "Device ID: {$this->device_id}", $log_msg);
-	
+		DataLoadLogDAO::logEvent2($this->db, $func_log_id, $log_seq++, 'DATA', "Authenticating as Device ID: {$this->device_id}", $log_msg);	
+
 		echo "Authenticating...\r\n";
 		
-		$response = json_decode($this->de->MakeRequest('AUTHENTICATE'), true);
-	
+		$response = $this->de->MakeRequest('AUTHENTICATE');
+		if(!$response) return false;
+
 		echo "Done!\r\n\r\n";
 	
 		// Save the player ID and Session ID
@@ -121,22 +134,41 @@ class WarOfNationsAuthentication {
 		// Cache the player ID so that we have it for other requests later
 		$this->de->AddCacheParam('player_id', $this->player_id);
 	
-		$log_msg = "Player ID: {$this->player_id}, Session ID: {$this->session_id}";
-		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'AUTHENTICATE', $log_seq++, 'RESPONSE', $log_msg, print_r($response, true));
-	
+		//$log_msg = "Player ID: {$this->player_id}, Session ID: {$this->session_id}";
+		
 		// If this was a new device, then save it to the database for future use
 		if($new) {
 			$device = new Device();
-			$device->device_uuid = $device_id;
-			$device->mac_address = $mac_address;
-			$device->platform = $device_platform;
-			$device->version = $device_version;
-			$device->device_type = $device_type;
+			$device->device_uuid = $this->device_id;
+			$device->mac_address = $this->mac_address;
+			$device->platform = $this->device_platform;
+			$device->version = $this->device_version;
+			$device->device_type = $this->device_type;
 			$device->use_proxy = 1;
 		
-			DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'AUTHENTICATE', $log_seq++, 'CREATING_NEW_DEVICE', null, var_dump($device));
+			DataLoadLogDAO::logEvent2($this->db, $func_log_id, $log_seq++, 'DATA', "Saving New Device", print_r($device, true));	
+
+			$this->local_device_id = DeviceDAO::insertDevice($this->db, $device);
+
+			if($this->db->hasError()) {
+				echo 'Error creating Device: ';
+				print_r($this->db->getError());
+				echo "\r\n";
+				
+				$log_msg = print_r($device, true)."\r\n\r\n".print_r($this->db->getError(), true);
+				DataLoadLogDAO::logEvent2($this->db, $func_log_id, $log_seq++, 'ERROR', "Error Saving New Device", $log_message, 1);	
+			}
+
+			$this->local_user_id = PgrmUserDAO::createUser($this->db, $this->user_id, $this->local_device_id);
 		
-			DeviceDAO::insertDevice($this->db, $device);
+			if($this->db->hasError()) {
+				echo 'Error creating User: ';
+				print_r($this->db->getError());
+				echo "\r\n";
+				
+				$log_msg = print_r($device, true)."\r\n\r\n".print_r($this->db->getError(), true);
+				DataLoadLogDAO::logEvent2($this->db, $func_log_id, $log_seq++, 'ERROR', "Error Saving New User", $log_msg, 1);	
+			}
 		}
 	
 		// Get the local World ID from our database
@@ -145,8 +177,8 @@ class WarOfNationsAuthentication {
 		
 		$this->authenticated = true;
 		
-		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'AUTHENTICATE', $log_seq++, 'COMPLETE', "Authenticated into World {$this->world_id}", null);
-	
+		DataLoadLogDAO::completeFunction($this->db, $func_log_id, "Authenticated into World {$this->world_id} as player {$this->player_id}");
+
 		// This allows other features of the program to use additional information about the user if needed after authenticating
 		if($return_full_response)
 			return $response;
@@ -169,54 +201,56 @@ class WarOfNationsAuthentication {
 
 		[{"transaction_time":"1410113200198","platform":"android","session_id":"8509859","start_sequence_num":3,"iphone_udid":"8763af18eb4deace1840060a3bd9086b","wd_player_id":0,"locale":"en-US","_explicitType":"Session","client_build":"251","game_name":"HCGame","api_version":"1","mac_address":"c8:aa:21:40:0a:2a","end_sequence_num":3,"req_id":1,"player_id":67174,"language":"en","game_data_version":"hc_20140903_38604","client_version":"1.8.4"},[{"service":"profile.profile","method":"finish_tutorial","_explicitType":"Command","params":[]}]]
 		*/
-	
+
 		$log_seq = 0;
-		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'FINISH_TUTORIAL', $log_seq++, 'START', null, null);
-	
-		$endpoint = Constants::$call;
-		$transaction_time = self::get_transaction_time();
-		$session_id = $this->session_id;
-		$device_id = $this->device_id;
-		$mac_address = $this->mac_address;
-		$tut_player_id = '67174'; // Figure out what this is...
-		$device_platform = $this->device_platform;
-		$device_version = $this->device_version;
-		$device_type = $this->device_type;
-		$data_string = '[{"transaction_time":"'.$transaction_time.'","platform":"'.$device_platform.'","session_id":"'.$session_id.'","start_sequence_num":3,"iphone_udid":"'.$device_id.'","wd_player_id":0,"locale":"en-US","_explicitType":"Session","client_build":"'.Constants::$client_build.'","game_name":"'.Constants::$game_name.'","api_version":"'.Constants::$api_version.'","mac_address":"'.$mac_address.'","end_sequence_num":3,"req_id":1,"player_id":'.$tut_player_id.',"language":"en","game_data_version":"'.Constants::$game_data_version.'","client_version":"'.Constants::$client_version.'"},[{"service":"profile.profile","method":"finish_tutorial","_explicitType":"Command","params":[]}]]';
-	
-		echo "Finishing Tutorial...<br/>\r\n";
-		// TODO: Make this use database driven request string...
-		$response = json_decode($this->ws->MakeRequest($endpoint, $data_string), true);
-		echo "Done!<br/>\r\n";
-	
-		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'FINISH_TUTORIAL', $log_seq++, 'RESPONSE', $log_msg, print_r($result, true));
+		$func_args = func_get_args();
+		$func_log_id = DataLoadLogDAO::startFunction($this->db, $this->data_load_id, __CLASS__,  __FUNCTION__, $func_args);
+
+		// Finish the tutoiral
+		echo "Finishing Tutorial...\r\n";
+		$params = array();
+		$params['tut_player_id'] = '67174';
+		$result = $this->de->MakeRequest('FINISH_TUTORIAL', $params);
+
+		if(!$result) return false;
+		echo "Done!\r\n";
 	
 		if($this->debug_level >= 30) {
 			echo '<pre>';
 			print_r($result);
 			echo '</pre>';
 		}
-	
+		
+		// Save our new player to the database
 		$this->player_id = $result['metadata']['player']['player_id'];
+		$this->world_id = WorldDAO::getLocalIdFromGameId($this->db, $result['metadata']['player']['world_id']);
 	
-		if($this->debug_level >= 20)
-			echo "New Player ID: {$this->player_id}";
+		// Cache the player ID so that we have it for other requests later
+		$this->de->AddCacheParam('player_id', $this->player_id);
 
-		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'FINISH_TUTORIAL', $log_seq++, 'COMPLETE', "Authenticated into World {$this->world_id}", null);
+		echo "New Player ID: {$this->player_id} in World {$this->world_id}\r\n\r\n";
+		$new_local_player_id = PgrmPlayerDAO::joinNewWorld($this->db, $this->player_id, $this->local_user_id, $this->world_id);
+
+		if($this->db->hasError()) {
+			echo 'Error joining world: ';
+			print_r($this->db->getError());
+			echo "\r\n";
+			
+			$log_msg = print_r($response, true)."\r\n\r\n".print_r($this->db->getError(), true);
+			DataLoadLogDAO::logEvent2($this->db, $func_log_id, $log_seq++, 'ERROR', "Error saving player into World {$this->world_id} as player {$this->player_id}", $log_msg, 1);	
+		}
+
+		DataLoadLogDAO::completeFunction($this->db, $func_log_id, "Completed Tutorial and joined World {$this->world_id} as player {$this->player_id}");
 	}
 
 	// In order to initialize a player into the world, you need to authenticate as a new device
 	// and then tell the game that you've completed the tutorial.
 	public function CreateNewPlayer() {
-		echo "Authenticating as New Device...<br/>\r\n";
-		$this->Authenticate(true);
-		echo "Done!<br/>\r\n";	
+		echo "Authenticating as New Device...\r\n";
+		$this->Authenticate(true, false);
+		echo "Done!\r\n";	
 	
-		echo "Finishing Tutorial...<br/>\r\n";
 		$this->FinishTutorial();
-		echo "Done!<br/>\r\n";
-	
-		// TODO: Save information to database
 	}
 
 	public function JoinNewWorld($world_id) {
@@ -236,15 +270,16 @@ class WarOfNationsAuthentication {
 		*/
 
 		$log_seq = 0;
-		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'JOIN_NEW_WORLD', $log_seq++, 'START', "Attempting to join World $world_id", null);
+		$func_args = func_get_args();
+		$func_log_id = DataLoadLogDAO::startFunction($this->db, $this->data_load_id, __CLASS__,  __FUNCTION__, $func_args);
 
+		echo "Joining World $world_id...\r\n";
 
 		$params = array();
 		$params['game_world_id'] = WorldDAO::getGameIdFromLocalId($this->db, $world_id);
 
-		$response = json_decode($this->de->MakeRequest('JOIN_NEW_WORLD', $params), true);
-
-		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'JOIN_NEW_WORLD', $log_seq++, 'RESPONSE', $log_msg, print_r($response, true));
+		$response = $this->de->MakeRequest('JOIN_NEW_WORLD', $params);
+		if(!$response) return false;
 
 		$this->world_id = $world_id;
 		$this->player_id = $response['metadata']['player']['player_id'];
@@ -258,10 +293,12 @@ class WarOfNationsAuthentication {
 			echo "\r\n";
 			
 			$log_msg = print_r($response, true)."\r\n\r\n".print_r($this->db->getError(), true);
-			DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'JOIN_NEW_WORLD', $log_seq++, 'ERROR_JOINING_WORLD', "World: {$this->world_id}, Player: {$this->player_id}", $log_msg, 1);	
+			DataLoadLogDAO::logEvent2($this->db, $func_log_id, $log_seq++, 'ERROR', "Error saving player into World {$this->world_id} as player {$this->player_id}", $log_msg, 1);	
 		}
 
-		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'JOIN_NEW_WORLD', $log_seq++, 'COMPLETE', "Joined World {$this->world_id} as player {$this->player_id}", null);
+		echo "Joined!\r\n";
+
+		DataLoadLogDAO::completeFunction($this->db, $func_log_id, "Joined World {$this->world_id} as player {$this->player_id}");
 
 		// Authenticate into our new world
 		$this->Authenticate();
@@ -287,20 +324,19 @@ class WarOfNationsAuthentication {
 		*/
 
 		$log_seq = 0;
-		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'SWITCH_WORLD', $log_seq++, 'START', "Attempting to switch to World $world_id", null);
-
+		$func_args = func_get_args();
+		$func_log_id = DataLoadLogDAO::startFunction($this->db, $this->data_load_id, __CLASS__,  __FUNCTION__, $func_args);
 
 		$params = array();
 		$params['game_world_id'] = WorldDAO::getGameIdFromLocalId($this->db, $world_id);
 
-		$response = json_decode($this->de->MakeRequest('SWITCH_WORLD', $params), true);
-
-		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'SWITCH_WORLD', $log_seq++, 'RESPONSE', null, print_r($response, true));
+		$response = $this->de->MakeRequest('SWITCH_WORLD', $params);
+		if(!$response) return false;
 
 		$this->world_id = $world_id;
 		$this->player_id = $response['metadata']['player']['player_id'];
 
-		DataLoadLogDAO::logEvent($this->db, $this->data_load_id, 'SWITCH_WORLD', $log_seq++, 'COMPLETE', "Switched to World {$this->world_id} as player {$this->player_id}", null);
+		DataLoadLogDAO::completeFunction($this->db, $func_log_id, "Switched to World {$this->world_id} as player {$this->player_id}");
 
 		// Authenticate into our new world
 		$this->Authenticate();

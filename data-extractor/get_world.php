@@ -44,8 +44,17 @@ $won->Authenticate();
 
 $start = microtime(true);
 
+// Break the world into 4 quadrants
+//  0 => -, -
+//  1 => +, -
+//  2 => +, +
+//  3 => -, +
 while($cur_quadrant <= 3) {
+	// This loop controls our position on the Y axis
+	//  We'll process the map in horizontal rows, starting from the center and going outward
 	while(sqrt(pow($cur_y, 2) - pow($cur_y/2, 2)) < $radius + ($cur_quadrant > 1 ? 0 : $interval)) {
+		// This loop controls our position on the X axis
+		//  Make sure we remain inside the circle of the map, when we reach the edge, end this loop
 		while(pow($cur_x, 2) + pow($cur_y, 2) - pow($cur_y/2, 2) <= $r2 + ($cur_quadrant == 2 ? 0 : $r2_offset)) {
 			switch($cur_quadrant) {
 				case 0:
@@ -66,7 +75,6 @@ while($cur_quadrant <= 3) {
 					break;
 			}
 			
-			
 			echo "Getting $tx, $ty\r\n";
 
 			// Use this to get only outside of the map if wanted.
@@ -84,10 +92,13 @@ while($cur_quadrant <= 3) {
 
 			$cur_x += $interval;
 		}
+		// We're done with the X axis for this row, Increment Y and reset X to 0
 		if(!$status) break;
 		$cur_y += $interval;
 		$cur_x = 0;
 	}
+
+	// We're done with this quadant, Increment the quadrant and reset Y to 0
 	if(!$status) break;
 	$cur_quadrant++;
 	$cur_y = 0;

@@ -1,0 +1,25 @@
+<?php
+/*
+$ac = array('9', 'h', 'T', 'D', 'v', 'O', '5', 'Z', 'f', 'w', 
+            'd', 'x', 'X', '1', 'J', 'h', 'u', 'Q', 'g', 'R');
+$ac1 = array('A', 't', 'j', 'k', 'd', '6', 'I', 'n', 'W', '7', 
+            'L', 'q', 'B', 'X', 'W', 'I', 'g', '6', 'T', '7');
+*/
+
+$ac = array('O', 'E', 'M', 'U');
+$ac1 = array('T', '4', 'z', '3');
+
+
+$key = '';
+for($i = 0; $i < count($ac); $i++) {
+	$key .= $ac[$i].$ac1[$i];
+}
+
+echo "$key\r\n";
+
+// 9AhtTjDkvdO65IZnfWw7dLxqXB1XJWhIugQ6gTR7
+// http://static-cdn.gcios.gree-apps.net/hc/images/asset_index/AssetIndex.db
+// http://static-cdn.gcios.gree-apps.net/hc/sqlite/hc_NA_20151123_60317/GameDataProvider.db
+
+// OTE4MzU3
+?>

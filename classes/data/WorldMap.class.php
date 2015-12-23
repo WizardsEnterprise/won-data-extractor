@@ -113,5 +113,6 @@ class Hex extends ModelBase {
 	
 	// Unstored Parameters
 	public $town_radius;
+	public $command_center = false;
 }
 ?>

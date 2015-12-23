@@ -10,6 +10,10 @@ class DeviceDAO {
 	public static function getActiveDevice($db) {
 		return $db->select("SELECT * FROM pgrm_devices d WHERE d.id = (SELECT CAST(value1 AS UNSIGNED) FROM pgrm_config c WHERE c.key='CURRENT_DEVICE_ID');")[0];
 	}
+
+	public static function getDeviceById($db, $device_id) {
+		return $db->select("SELECT * FROM pgrm_devices d WHERE d.id = ?", array($device_id))[0];
+	}
 	
 	public static function insertDevice($db, $Device) {
 		global $debug;
@@ -36,7 +40,7 @@ class DeviceDAO {
 }
 
 class DeviceMapper {
-	public static $mapping = array('id' => 'id', 'device_uuid' => 'device_uuid', 'mac_address' => 'mac_address',
+	public static $mapping = array('id' => 'id', 'device_uuid' => 'device_uuid', 'vendor_id' => 'device_uuid', 'mac_address' => 'mac_address',
 								   'platform' => 'platform', 'version' => 'version', 'device_type' => 'device_type',
 								   'use_proxy' => 'use_proxy');
 	

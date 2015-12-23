@@ -84,7 +84,15 @@ class WarOfNationsDataExtractor {
 		$data_string = $this->BuildRequest($method, $request['request_string'], $params);
 		
 		// Call the webservice
-		return $this->ws->MakeRequest($request['endpoint'], $data_string);
+		$response = $this->ws->MakeRequest($request['endpoint'], $data_string, $method);
+
+		// TODO: Ungzip here
+
+
+		// TODO: JSON Decode
+
+		return $response;
+
 	}
 	
 	
