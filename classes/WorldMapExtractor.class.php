@@ -77,9 +77,7 @@ class WorldMapExtractor {
 		$retry_count = 0;
 		
 		$result = $this->de->MakeRequest('GET_MAP_DATA', $params);
-		if(!$result) return false;
-
-		$result = json_decode($result_string, true);
+		
 		if($result === false) {
 			DataLoadLogDAO::completeFunction($this->db, $func_log_id, 'Error getting map data.  See ws request log.', 1);
 			return false;
