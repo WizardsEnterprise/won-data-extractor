@@ -10,7 +10,7 @@ class DatabaseFactory {
 	public static function getDatabase() {
 		switch(gethostname()) {
 			case 'WON-Data-Extractor': 
-				return new DataAccess('localhost', 'war_of_nations', 'SVxE3FXYHuEm5cxM', self::$dbname);
+				return new DataAccess('localhost', 'won_data_extract', 'nZSLuXDE5xFuVU7S', self::$dbname);
 			default:
 				return new DataAccess(self::$host, self::$user, self::$pass, self::$dbname);
 		}
