@@ -4,7 +4,7 @@ require_once(dirname(__FILE__) . '/../classes/WarOfNations2.class.php');
 require_once(dirname(__FILE__) . '/../classes/data/DataLoad.class.php');
 
 
-require('../vendor/autoload.php');
+require_once(dirname(__FILE__) . '/../vendor/autoload.php');
 
 use WebSocket\Client;
 
