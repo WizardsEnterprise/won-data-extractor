@@ -1,6 +1,6 @@
 <?php
-require_once('MapperHelper.class.php');
-require_once('ModelBase.class.php');
+require_once(dirname(__FILE__) . '/MapperHelper.class.php');
+require_once(dirname(__FILE__) . '/ModelBase.class.php');
 
 class PlayerDAO {
 	public static function getAllPlayers($db) {

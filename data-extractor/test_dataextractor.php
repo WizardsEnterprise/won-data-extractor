@@ -1,6 +1,6 @@
 <?php
-require_once('../classes/WarOfNationsDataExtractor.class.php');
-require_once('../classes/data/Device.class.php');
+require_once(dirname(__FILE__) . '/../classes/WarOfNationsDataExtractor.class.php');
+require_once(dirname(__FILE__) . '/../classes/data/Device.class.php');
 
 $de = new WarOfNationsDataExtractor();
 $a = new WarOfNationsAuthentication();

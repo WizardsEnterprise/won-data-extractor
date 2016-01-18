@@ -1,7 +1,7 @@
 <?php
-require_once('data/DataLoadLog.class.php');
-require_once('data/Player.class.php');
-require_once('data/Guild.class.php');
+require_once(dirname(__FILE__) . '/data/DataLoadLog.class.php');
+require_once(dirname(__FILE__) . '/data/Player.class.php');
+require_once(dirname(__FILE__) . '/data/Guild.class.php');
 
 class LeaderboardExtractor {
 	// Database

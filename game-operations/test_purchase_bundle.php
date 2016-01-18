@@ -1,7 +1,7 @@
 <?php
 
-require_once('../classes/WarOfNations2.class.php');
-require_once('../classes/data/DataLoad.class.php');
+require_once(dirname(__FILE__) . '/../classes/WarOfNations2.class.php');
+require_once(dirname(__FILE__) . '/../classes/data/DataLoad.class.php');
 
 
 require('../vendor/autoload.php');

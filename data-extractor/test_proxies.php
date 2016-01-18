@@ -1,6 +1,6 @@
 <?php
-require_once('classes/data/DatabaseFactory.class.php');
-require_once('classes/data/Proxy.class.php');
+require_once(dirname(__FILE__) . '/classes/data/DatabaseFactory.class.php');
+require_once(dirname(__FILE__) . '/classes/data/Proxy.class.php');
 
 $debug = false;
 

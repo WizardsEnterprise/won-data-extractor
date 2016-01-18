@@ -1,6 +1,6 @@
 <?php
-require_once('../classes/WarOfNations.class.php');
-require_once('../classes/data/DataLoad.class.php');
+require_once(dirname(__FILE__) . '/../classes/WarOfNations.class.php');
+require_once(dirname(__FILE__) . '/../classes/data/DataLoad.class.php');
 
 $won = new WarOfNations(0);
 

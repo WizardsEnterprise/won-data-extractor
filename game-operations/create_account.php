@@ -1,6 +1,6 @@
 <?php
-require_once('../classes/WarOfNations2.class.php');
-require_once('../classes/data/DataLoad.class.php');
+require_once(dirname(__FILE__) . '/../classes/WarOfNations2.class.php');
+require_once(dirname(__FILE__) . '/../classes/data/DataLoad.class.php');
 
 // Initialize Variables
 $alliance_to_join = '101013232844480'; // 1st_HQ

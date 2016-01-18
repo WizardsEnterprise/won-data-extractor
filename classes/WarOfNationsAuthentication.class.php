@@ -1,9 +1,9 @@
 <?php
-require_once('data/DataLoadLog.class.php');
-require_once('data/Device.class.php');
-require_once('data/World.class.php');
-require_once('data/PgrmPlayers.class.php');
-require_once('data/PgrmUsers.class.php');
+require_once(dirname(__FILE__) . '/data/DataLoadLog.class.php');
+require_once(dirname(__FILE__) . '/data/Device.class.php');
+require_once(dirname(__FILE__) . '/data/World.class.php');
+require_once(dirname(__FILE__) . '/data/PgrmPlayers.class.php');
+require_once(dirname(__FILE__) . '/data/PgrmUsers.class.php');
 
 class WarOfNationsAuthentication {
 	// Database

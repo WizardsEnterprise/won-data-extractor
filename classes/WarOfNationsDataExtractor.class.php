@@ -1,8 +1,8 @@
 <?php
-require_once('data/Proxy.class.php');
-require_once('data/ServiceRequest.class.php');
-require_once('data/PgrmConfig.class.php');
-require_once('WarOfNationsWS.class.php');
+require_once(dirname(__FILE__) . '/data/Proxy.class.php');
+require_once(dirname(__FILE__) . '/data/ServiceRequest.class.php');
+require_once(dirname(__FILE__) . '/data/PgrmConfig.class.php');
+require_once(dirname(__FILE__) . '/WarOfNationsWS.class.php');
 
 // Known Player IDs, Devices:
 // Main: 101013866213677, 66d2ea9883993b46e9f06fba6e652302 

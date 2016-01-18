@@ -1,6 +1,6 @@
 <?php
-require_once('../classes/WarOfNations2.class.php');
-require_once('../classes/data/DataLoad.class.php');
+require_once(dirname(__FILE__) . '/../classes/WarOfNations2.class.php');
+require_once(dirname(__FILE__) . '/../classes/data/DataLoad.class.php');
 
 $radius = 1472;
 $r2 = pow($radius, 2);

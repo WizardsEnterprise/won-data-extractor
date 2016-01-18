@@ -1,12 +1,12 @@
 <?php
-require_once('data/DatabaseFactory.class.php');
-require_once('WarOfNationsDataExtractor.class.php');
-require_once('WarOfNationsAuthentication.class.php');
-require_once('WorldMapExtractor.class.php');
-require_once('LeaderboardExtractor.class.php');
-require_once('GameOperations.class.php');
-require_once('UplinkService.class.php');
-require_once('../PHPMailer/PHPMailerAutoload.php');
+require_once(dirname(__FILE__) . '/data/DatabaseFactory.class.php');
+require_once(dirname(__FILE__) . '/WarOfNationsDataExtractor.class.php');
+require_once(dirname(__FILE__) . '/WarOfNationsAuthentication.class.php');
+require_once(dirname(__FILE__) . '/WorldMapExtractor.class.php');
+require_once(dirname(__FILE__) . '/LeaderboardExtractor.class.php');
+require_once(dirname(__FILE__) . '/GameOperations.class.php');
+require_once(dirname(__FILE__) . '/UplinkService.class.php');
+require_once(dirname(__FILE__) . '/../PHPMailer/PHPMailerAutoload.php');
 
 class WarOfNations {
 	// Database

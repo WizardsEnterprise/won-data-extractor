@@ -1,5 +1,5 @@
 <?php
-require_once("DataAccess.class.php");
+require_once(dirname(__FILE__) . '/DataAccess.class.php');
 
 class DatabaseFactory {
 	private static $host = 'localhost';
