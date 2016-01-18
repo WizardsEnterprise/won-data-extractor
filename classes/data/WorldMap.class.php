@@ -67,6 +67,8 @@ class WorldMapDAO {
 		where wh.world_id in (13) and wh.player_id is not null and wh.town_id is not null and wh.town_name is not null;
 		*/
 
+		global $debug;
+
 		$sql = "UPDATE world_hexes as wh set wh.resource_patches = (select sum(case when wh2.resource_id is not null then 1 else 0 end)
 		from (select world_id, player_id, town_id, resource_id from world_hexes where world_id = ? and (resource_id is not null or building_id in (1, 2))) as wh2 
 		where wh2.player_id = wh.player_id and wh2.town_id = wh.town_id and wh2.world_id = wh.world_id) 
@@ -89,6 +91,8 @@ class WorldMapDAO {
 		insert into world_hexes_archive select * from world_hexes wh where wh.data_load_id is null or (wh.data_load_id < 744 and wh.world_id = 13) order by wh.data_load_id, wh.x_coord, wh.y_coord;
 		delete from world_hexes where data_load_id is null or data_load_id < 744 and world_id = 13;
 		*/
+
+		global $debug;
 
 		// Same params for both queries
 		$params = array($data_load_id, $world_id);
