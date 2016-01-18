@@ -108,6 +108,9 @@ $end = microtime(true);
 
 echo "$count calls to map service in ".($end - $start)." seconds.\r\n";
 
+// Finish up the map extraction by setting resource patch counts and archiving bases
+$won->map->CompleteWorldMapExtraction();
+
 DataLoadDAO::loadComplete($won->db, $won->data_load_id);
 
 ?>

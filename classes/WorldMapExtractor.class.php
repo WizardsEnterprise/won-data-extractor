@@ -276,5 +276,46 @@ class WorldMapExtractor {
 		echo "Created $hex_count Hexes\r\n";
 		return true;
 	}
+
+	public function CompleteWorldMapExtraction() {
+		$log_seq = 0;
+		$func_log_id = DataLoadLogDAO::startFunction($this->db, $this->data_load_id, __CLASS__,  __FUNCTION__);
+
+		DataLoadLogDAO::logEvent2($this->db, $func_log_id, $log_seq++, 'DEBUG', 'Before Setting Resource Patch Counts');
+		$updates = WorldMapDAO::setResourcePatches($this->db, $this->auth->world_id);
+		if($this->db->hasError()) {
+			echo "Error updating resource patches for world {$this->auth->world_id}: \r\n";
+			print_r($this->db->getError());
+			echo "\r\n";
+			
+			$log_msg = print_r($this->db->getError(), true);
+			DataLoadLogDAO::logEvent2($this->db, $func_log_id, $log_seq++, 'ERROR', "Error updating resource patches in World {$this->auth->world_id}", $log_msg, 1);
+		} else {
+			echo "Updated $updates bases resource patch counts\r\n";
+			DataLoadLogDAO::logEvent2($this->db, $func_log_id, $log_seq++, 'INFO', "Updated $updates bases resource patch counts");
+		}
+		
+		DataLoadLogDAO::logEvent2($this->db, $func_log_id, $log_seq++, 'DEBUG', 'Before Archiving Old Bases');
+		$archives = WorldMapDAO::archiveOldBases($this->db, $this->auth->world_id, $this->data_load_id);
+		if($archives !== false) {
+			echo "Archived $archives bases from world {$this->auth->world_id} older than data load {$this->data_load_id}\r\n";
+			DataLoadLogDAO::logEvent2($this->db, $func_log_id, $log_seq++, 'INFO', "Archived $archives bases from world {$this->auth->world_id} older than data load {$this->data_load_id}");
+		} else if($this->db->hasError()) {
+			echo "Error archiving bases from world {$this->auth->world_id} older than data load {$this->data_load_id}: \r\n";
+			print_r($this->db->getError());
+			echo "\r\n";
+
+			$log_msg = print_r($this->db->getError(), true);
+			DataLoadLogDAO::logEvent2($this->db, $func_log_id, $log_seq++, 'ERROR', "Database Error while archiving bases from world {$this->auth->world_id} older than data load {$this->data_load_id}", $log_msg, 1);
+
+		} else {
+			echo "Error archiving bases from world {$this->auth->world_id}";
+			DataLoadLogDAO::logEvent2($this->db, $func_log_id, $log_seq++, 'ERROR', "Unknown error while archiving bases from world {$this->auth->world_id} older than data load {$this->data_load_id}", 1);
+		}
+
+		DataLoadLogDAO::completeFunction($this->db, $func_log_id, "Updated $updates resource patches and archived $archives bases from world {$this->auth->world_id}");
+		return true;
+
+	}
 }
 ?>

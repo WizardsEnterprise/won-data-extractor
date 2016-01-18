@@ -58,6 +58,67 @@ class WorldMapDAO {
 		
 		return $db->Update($sql, $paramValues);
 	}
+
+	public static function setResourcePatches($db, $world_id) {
+		/*
+		update world_hexes as wh set wh.resource_patches = (select sum(case when wh2.resource_id is not null then 1 else 0 end)
+		from (select world_id, player_id, town_id, resource_id from world_hexes where world_id in (13) and (resource_id is not null or building_id in (1, 2))) as wh2 
+		where wh2.player_id = wh.player_id and wh2.town_id = wh.town_id and wh2.world_id = wh.world_id) 
+		where wh.world_id in (13) and wh.player_id is not null and wh.town_id is not null and wh.town_name is not null;
+		*/
+
+		$sql = "UPDATE world_hexes as wh set wh.resource_patches = (select sum(case when wh2.resource_id is not null then 1 else 0 end)
+		from (select world_id, player_id, town_id, resource_id from world_hexes where world_id = ? and (resource_id is not null or building_id in (1, 2))) as wh2 
+		where wh2.player_id = wh.player_id and wh2.town_id = wh.town_id and wh2.world_id = wh.world_id) 
+		where wh.world_id = ? and wh.player_id is not null and wh.town_id is not null and wh.town_name is not null";
+		
+		$params = array($world_id, $world_id);
+
+		if($debug) {
+			echo 'SQL Query:'.PHP_EOL;
+			echo $sql.PHP_EOL;
+			echo 'Params Array:'.PHP_EOL;
+			print_r($params);
+		}
+
+		return $db->Update($sql, $params);
+	}
+
+	public static function archiveOldBases($db, $world_id, $data_load_id) {
+		/*
+		insert into world_hexes_archive select * from world_hexes wh where wh.data_load_id is null or (wh.data_load_id < 744 and wh.world_id = 13) order by wh.data_load_id, wh.x_coord, wh.y_coord;
+		delete from world_hexes where data_load_id is null or data_load_id < 744 and world_id = 13;
+		*/
+
+		// Same params for both queries
+		$params = array($data_load_id, $world_id);
+
+		$sql = "INSERT into world_hexes_archive select * from world_hexes wh where (wh.data_load_id < ? and wh.world_id = ?) order by wh.data_load_id, wh.x_coord, wh.y_coord";
+
+		if($debug) {
+			echo 'SQL Query:'.PHP_EOL;
+			echo $sql.PHP_EOL;
+			echo 'Params Array:'.PHP_EOL;
+			print_r($params);
+		}
+
+		$insert_count = $db->Update($sql, $params);
+
+		$sql = "DELETE from world_hexes where data_load_id < ? and world_id = ?";
+
+		if($debug) {
+			echo 'SQL Query:'.PHP_EOL;
+			echo $sql.PHP_EOL;
+			echo 'Params Array:'.PHP_EOL;
+			print_r($params);
+		}
+
+		$delete_count = $db->Update($sql, $params);
+
+		if ($insert_count == $delete_count)
+			return $insert_count;
+		return false;
+	}
 }
 
 class HexMapper {
