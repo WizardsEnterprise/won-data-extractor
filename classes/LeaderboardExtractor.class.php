@@ -132,6 +132,7 @@ class LeaderboardExtractor {
 				$guild->leader_id = $leader_id;
 			$guild->guild_name = $leader['guild_name'];
 			$guild->battle_points = $leader['score'];
+			$guild->glory_points = $leader['glory_points'];
 			$guild->members = $leader['member_count'];
 
 			$id = GuildDAO::getLocalIdFromGameId($this->db, $guild->game_guild_id);
