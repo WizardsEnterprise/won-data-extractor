@@ -51,5 +51,20 @@ class DataLoadDAO {
 		
 		return $rows_updated;
 	}
+
+	public static function cleanupWebserviceLogs($db, $data_load_id = false) {
+		if($data_load_id === false)
+			$rows_updated = $db->Update("UPDATE data_load_ws_log wl SET request_data = NULL, response_data = NULL, response_array = NULL");
+		else	
+			$rows_updated = $db->Update("UPDATE data_load_ws_log wl SET request_data = NULL, response_data = NULL, response_array = NULL where wl.data_load_func_id in (select id from data_load_func_log fl where fl.data_load_id = ?)", array($data_load_id));
+		
+		if($db->hasError()) {
+			echo 'Error updating log: ';
+			print_r($db->getError());
+			echo "\r\n";
+		}
+		
+		return $rows_updated;
+	}
 }
 ?>

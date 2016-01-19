@@ -84,7 +84,7 @@ class DataAccess {
 	// Update - Executes the passed insert statement
 	// Parameters: Query, Array of Parameters
 	// Returns: The number of rows updated
-	function Update($query, $params) {
+	function Update($query, $params = array()) {
 		foreach($params as $key => $param) {
 			if(!isset($params[$key])) {
 				$params[$key] = null;
@@ -146,6 +146,24 @@ class DataAccess {
 	
 	function SelectOne($query, $params = array()) {
 		return $this->Select($query, $params)[0];
+	}
+
+	// Execute - Executes the passed statement
+	// Parameters: Query, Array of Parameters
+	// Returns: True if successful, False otherwise
+	function Execute($query, $params) {
+		foreach($params as $key => $param) {
+			if(!isset($params[$key])) {
+				$params[$key] = null;
+			}
+		}
+
+		$stmt = $this->PrepareAndExecuteQuery($query, $params);
+		
+		if(!$stmt || $this->errno !== false)
+			return false;
+		
+		return true;
 	}
 }
 
