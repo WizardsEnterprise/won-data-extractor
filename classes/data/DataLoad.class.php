@@ -4,8 +4,8 @@ class DataLoadDAO {
 		return $db->Select("SELECT * FROM data_loads");
 	}
 	
-	public static function initNewLoad($db, $load_type, $total_operations) {
-		$data_load_id = $db->Insert("INSERT INTO data_loads (load_type, total_operations) VALUES (?, ?)", array($load_type, $total_operations));
+	public static function initNewLoad($db, $load_type, $total_operations, $desc = null) {
+		$data_load_id = $db->Insert("INSERT INTO data_loads (load_type, load_desc, total_operations) VALUES (?, ?, ?)", array($load_type, $desc, $total_operations));
 		
 		if($db->hasError()) {
 			echo 'Error inserting log: ';

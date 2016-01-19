@@ -301,7 +301,7 @@ class WarOfNationsAuthentication {
 		DataLoadLogDAO::completeFunction($this->db, $func_log_id, "Joined World {$this->world_id} as player {$this->player_id}");
 
 		// Authenticate into our new world
-		$this->Authenticate();
+		return $this->Authenticate();
 	}
 
 	public function SwitchWorld($world_id) {
@@ -327,11 +327,18 @@ class WarOfNationsAuthentication {
 		$func_args = func_get_args();
 		$func_log_id = DataLoadLogDAO::startFunction($this->db, $this->data_load_id, __CLASS__,  __FUNCTION__, $func_args);
 
+		echo "Switching to World $world_id...\r\n";
+
 		$params = array();
 		$params['game_world_id'] = WorldDAO::getGameIdFromLocalId($this->db, $world_id);
 
 		$response = $this->de->MakeRequest('SWITCH_WORLD', $params);
 		if(!$response) return false;
+
+		$success = $response['responses'][0]['return_value']['success'];
+		
+		if($success != 1)
+			return false;
 
 		$this->world_id = $world_id;
 		$this->player_id = $response['metadata']['player']['player_id'];
@@ -339,7 +346,7 @@ class WarOfNationsAuthentication {
 		DataLoadLogDAO::completeFunction($this->db, $func_log_id, "Switched to World {$this->world_id} as player {$this->player_id}");
 
 		// Authenticate into our new world
-		$this->Authenticate();
+		return $this->Authenticate();
 	}
 }
 ?>

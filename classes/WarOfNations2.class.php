@@ -98,14 +98,14 @@ class WarOfNations {
 		// Ensure that we're authenticated already
 		$this->Authenticate();
 		
-		$this->auth->JoinNewWorld($world_id);
+		return $this->auth->JoinNewWorld($world_id);
 	}
 
 	function SwitchWorld($world_id) {
 		// Ensure that we're authenticated already
 		$this->Authenticate();
 		
-		$this->auth->SwitchWorld($world_id);
+		return $this->auth->SwitchWorld($world_id);
 	}
 
 	function GetGameOperations() {
