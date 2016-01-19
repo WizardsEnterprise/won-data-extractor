@@ -56,7 +56,7 @@ echo "Done!\r\n";
 
 DataLoadDAO::loadComplete($won->db, $won->data_load_id);
 
-$won->setDataLoadId(DataLoadDAO::initNewLoad($won->db, 'ALLIANCE_LEADERBOARDS', $top_x_alliances/$interval));
+$won->setDataLoadId(DataLoadDAO::initNewLoad($won->db, 'ALLIANCE_LEADERBOARDS', $top_x_alliances/$interval, "World $world"));
 DataLoadDAO::startLoad($won->db, $won->data_load_id);
 
 echo "\r\nGetting Top $top_x_alliances Alliance Leaderboards\r\n";
