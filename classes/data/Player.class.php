@@ -75,6 +75,9 @@ class PlayerDAO {
 	}
 	
 	public static function playerHasMeaningfulDifference($p1, $p2, $customExcludes = array()) {
+		if(is_null($p1->player_name))
+			return false;
+
 		if(!in_array('player_name', $customExcludes) && $p1->player_name != $p2->player_name)
 			return true;
 		
