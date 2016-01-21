@@ -55,6 +55,7 @@ class PlayerDAO {
 			return true;
 		}
 		
+		// Only insert a history record if we actually had meaningful data already
 		if(!is_null($existing_player->player_name))
 			self::insertPlayer($db, $existing_player, true);
 		
