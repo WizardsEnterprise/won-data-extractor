@@ -165,6 +165,14 @@ class WorldMapExtractor {
 			$hex->is_sb = null;
 			$hex->is_npc = null;
 			
+			// Handle Alliance Base as a special case
+			if($hex->is_guild_town_center === 1) {
+				$hex->town_name = $hex->guild_name;
+				$hex->player_name = $hex->guild_name;
+				$hex->player_level = $hex->guild_town_phase;
+				$hex->building_id = 15;
+			}
+
 			// If this is a town tile then we have additional information, so let's process it
 			if(isset($hex->town_name) || in_array($hex->building_id, array(14))) {
 				$hex->command_center = true;

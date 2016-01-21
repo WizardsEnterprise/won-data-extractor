@@ -155,29 +155,49 @@ class Hex extends ModelBase {
 	public $hex_x;
 	public $hex_y;
 	public $type;
+
+	// Player Info
 	public $player_id;
 	public $npc_player_id;
 	public $player_name;
 	public $player_level;
+
+	// Base Info
 	public $town_id;
 	public $town_name;
+
+	// Alliance Info
 	public $guild_id;
 	public $guild_name;
+
+	// Building Info
 	public $building_id;
 	public $building_unique_id;
+
+	// Flags
 	public $is_sb;
 	public $is_npc;
-	public $version;
+
+	// Resource Info
 	public $resource_id;
 	public $resource_level;
-	public $destroyed;
+
+	// Holdout
 	public $event_entity_type;
 	public $league_tier;
+
+	// Probably not needed
+	public $version;
+	public $destroyed;
+
+	// Data Load Info
 	public $data_load_id;
 	public $mapper = 'HexMapper';
 	
 	// Unstored Parameters
 	public $town_radius;
+	public $is_guild_town_center;
+	public $guild_town_phase;
 	public $command_center = false;
 }
 ?>

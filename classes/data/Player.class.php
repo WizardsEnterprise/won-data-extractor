@@ -54,8 +54,9 @@ class PlayerDAO {
 			//echo "player {$Player->player_name} has no changes \r\n";
 			return true;
 		}
-			
-		self::insertPlayer($db, $existing_player, true);
+		
+		if(!is_null($existing_player->player_name))
+			self::insertPlayer($db, $existing_player, true);
 		
 		/* Update the existing record with the newly acquired information */
 		$updateStr = '`'.implode('`=?, `', PlayerMapper::ColumnNames('Update', $customExcludes)).'`=?';
@@ -75,9 +76,6 @@ class PlayerDAO {
 	}
 	
 	public static function playerHasMeaningfulDifference($p1, $p2, $customExcludes = array()) {
-		if(is_null($p1->player_name))
-			return false;
-
 		if(!in_array('player_name', $customExcludes) && $p1->player_name != $p2->player_name)
 			return true;
 		

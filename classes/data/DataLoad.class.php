@@ -52,6 +52,18 @@ class DataLoadDAO {
 		return $rows_updated;
 	}
 
+	public static function loadFailed($db, $data_load_id) {
+		$rows_updated = $db->Update("UPDATE data_loads d SET status = 'FAILED' WHERE d.id = ?", array($data_load_id));
+		
+		if($db->hasError()) {
+			echo 'Error updating log: ';
+			print_r($db->getError());
+			echo "\r\n";
+		}
+		
+		return $rows_updated;
+	}
+
 	public static function cleanupWebserviceLogs($db, $data_load_id = false) {
 		if($data_load_id === false)
 			$rows_updated = $db->Update("UPDATE data_load_ws_log wl SET request_data = NULL, response_data = NULL, response_array = NULL");

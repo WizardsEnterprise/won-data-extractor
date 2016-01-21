@@ -52,6 +52,12 @@ if($won->auth->world_id != $world) {
 	}
 }
 
+// If we're still not in the right world, quit
+if($won->auth->world_id != $world) {
+	DataLoadDAO::loadFailed($won->db, $won->data_load_id);
+	die("ERROR: Not Authenticated to World $world");
+}
+
 /*
 =======================================================
 ===================== Do Stuff ========================
