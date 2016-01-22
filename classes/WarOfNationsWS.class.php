@@ -64,7 +64,8 @@ class WarOfNationsWS {
 		}
 		
 		curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "POST");		
-		curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+		curl_setopt($ch, CURLOPT_RETURNTRANSFER, true); // Return the response as a string - do not output
+		curl_setopt($ch, CURLOPT_FRESH_CONNECT, true); // Try to force the use of a fresh connection - no cache
 		curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5); // Timeout in seconds - prevents taking a long time to connect to a bad proxy
 		curl_setopt($ch, CURLOPT_TIMEOUT, 10); // Timeout in seconds - prevents taking a long time to connect to a bad proxy
 		
