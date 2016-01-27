@@ -218,6 +218,7 @@ class WarOfNationsWS {
 			DataLoadLogDAO::completeFunction($this->db, $func_log_id, 'Request Successful');
 		else {
 			$status_str = "Statuses: [{$json_array['status']}], [{$json_array['responses'][0]['status']}]";
+			DataLoadLogDAO::webServiceStatusFailure($this->db, $request_id);
 			DataLoadLogDAO::completeFunction($this->db, $func_log_id, "Request Failed.  $status_str", 1);
 			DataLoadDAO::loadFailed($this->db, $this->data_load_id);
 			die("Data Load Failed. $status_str");

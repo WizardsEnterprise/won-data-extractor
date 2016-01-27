@@ -114,7 +114,28 @@ class DataLoadLogDAO {
 		$rows_updated = $db->Update("UPDATE data_load_ws_log SET response_data = ?, complete_seconds = ?, response_array = ? WHERE id = ?", $params);
 		
 		if($db->hasError()) {
-			echo 'Error COMPLETING function log: ';
+			echo 'Error COMPLETING Web Service Request log: ';
+			print_r($db->getError());
+			echo "\r\n";
+		}
+
+		if($rows_updated > 1) 
+			echo "WARNING: More than 1 web service log row updated! id = [$request_id]\r\n";
+
+		if($rows_updated == 0) 
+			echo "WARNING: No web service log rows updated! id = [$request_id]\r\n";
+
+		return $rows_updated;
+	}
+
+	public static function WebServiceStatusFailure($db, $request_id) {
+		$params = array();
+		$params[] = $request_id;
+
+		$rows_updated = $db->Update("UPDATE data_load_ws_log SET status_error = 1 WHERE id = ?", $params);
+		
+		if($db->hasError()) {
+			echo 'Error SETTING ERROR BIT on Web Service Request log: ';
 			print_r($db->getError());
 			echo "\r\n";
 		}
