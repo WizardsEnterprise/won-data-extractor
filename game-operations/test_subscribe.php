@@ -70,10 +70,14 @@ while(true){
 }
 */
 
+$won->Authenticate(false, 5);
+
 $uplink = $won->GetUplinkService();
 
 $uplink->Subscribe();
 
 $uplink->Run();
+
+DataLoadDAO::loadComplete($won->db, $won->data_load_id);
 
 ?>

@@ -37,19 +37,19 @@ class UplinkService {
 		$func_args = func_get_args();
 		$func_log_id = DataLoadLogDAO::startFunction($this->db, $this->data_load_id, __CLASS__,  __FUNCTION__, $func_args);
 
-		echo "Subscribing...\r\n";
+		echo "Subscribing...\n";
 
 		$result = $this->de->MakeRequest('SUBSCRIBE_UPLINK');
 		if(!$result) return false;
 
 		if($result['status'] == 'OK') {
-			echo "Subscribed!\r\n";
+			echo "Subscribed!\n";
 
 			DataLoadLogDAO::logEvent2($this->db, $func_log_id, $log_seq++, 'INFO', "Subscribed to Uplink Service");	
 
 			$uplink_info = $result['responses'][0]['return_value']['uplink_info'];
 		} else {
-			echo "Failed to Subscribe!\r\n";
+			echo "Failed to Subscribe!\n";
 
 			DataLoadLogDAO::completeFunction($this->db, $func_log_id, 'Failed to Subscribe to Uplink Service', 1);
 
@@ -64,7 +64,7 @@ class UplinkService {
 		$this->client = new Client($socket_addr);
 		DataLoadLogDAO::logEvent2($this->db, $func_log_id, $log_seq++, 'INFO', "Successfully opened connection to socket");	
 
-		echo "Connected!\r\n";
+		echo "Connected!\n";
 
 		$this->client->setTimeout(30);
 
@@ -72,7 +72,7 @@ class UplinkService {
 		$token = $uplink_info['token'];
 		$msg = '{"payload":{"hub":"war-of-nations-and","id":"'.$player_id.'","token":"'.$token.'"},"type":"subscribe"}';
 
-		echo "Sending: $msg\r\n";
+		echo "Sending: $msg\n";
 
 		DataLoadLogDAO::logEvent2($this->db, $func_log_id, $log_seq++, 'INFO', "Sending subscribe message to $socket_addr", $msg);	
 		$this->client->send($msg);
@@ -80,7 +80,9 @@ class UplinkService {
 
 		DataLoadLogDAO::completeFunction($this->db, $func_log_id, 'Successfully Subscribed to Uplink Socket');
 
-		echo "Sent!\r\n\r\n";
+		echo "Sent!\n\n";
+
+		return true;
 	}
 
 	public function Run() {
@@ -90,73 +92,92 @@ class UplinkService {
     	$func_args = func_get_args();
 		$func_log_id = DataLoadLogDAO::startFunction($this->db, $this->data_load_id, __CLASS__,  __FUNCTION__, $func_args);
 
+		$seconds_between_heartbeat = 30;
+		$closed = false;
         while(1){
             DataLoadLogDAO::logEvent2($this->db, $func_log_id, $log_seq++, 'INFO', "Send heartbeat message");	
 
-            echo "Sending: $heartbeat_msg\r\n";
+            echo "Sending: $heartbeat_msg\n----------\n";
 			$this->client->send($heartbeat_msg);
+			$last_heartbeat = microtime(true);
 			DataLoadDAO::operationComplete($this->db, $this->data_load_id);
 
 			// This loop controls how many times we will try go receive in between heartbeats
-    		for($i = 0; $i < 1; $i++) {
-	            while(1){
-		            try {
-		            	$message_handled = false;
-		            	$opcode = '';
+    		//for($i = 0; $i < 1; $i++) {
+			// Continue reading until we run out of content to read, disconnect, or reach our heartbeat time
+            while(1){
+	            try {
+	            	$message_handled = false;
+	            	$opcode = '';
 
-		            	DataLoadLogDAO::logEvent2($this->db, $func_log_id, $log_seq++, 'INFO', "Listening...");	
+	            	DataLoadLogDAO::logEvent2($this->db, $func_log_id, $log_seq++, 'INFO', "Listening...");	
 
-		            	echo "Receiving: ";
-		            	
-		            	$data = $this->client->receive();
-		            	$opcode = $this->client->getLastOpcode();
+	            	$seconds_since_heartbeat = (microtime(true) - $last_heartbeat);
+	            	echo "Seconds Since Heartbeat: $seconds_since_heartbeat\n";
+	            	$new_timeout = round(($seconds_between_heartbeat - $seconds_since_heartbeat), 0);
+	            	if($new_timeout <= 0) 
+	            		break;
 
-						echo "$opcode: [$data]\r\n";
-						DataLoadLogDAO::logEvent2($this->db, $func_log_id, $log_seq++, 'INFO', "Receive Complete [$opcode]", $data);	
+	            	echo "New Heartbeat Timeout: $new_timeout seconds\n";
 
-						// Handle special cases here
-		            	switch($opcode) {
-		            		case 'ping': // Respond with pong
-		            			echo "Sending Pong\r\n";
-		            			DataLoadLogDAO::logEvent2($this->db, $func_log_id, $log_seq++, 'INFO', "Send pong message");	
+	            	echo "Receiving: ";
+	            	$this->client->setTimeout($new_timeout);
+	            	$data = $this->client->receive();
+	            	$opcode = $this->client->getLastOpcode();
 
-		            			$this->client->send('', 'pong');
-		            			$message_handled = true;
-		            			break;
-		            		case 'close':
-		            			$message_handled = true;
-		            			break;
-		            	}
+					echo "$opcode\n";
+					DataLoadLogDAO::logEvent2($this->db, $func_log_id, $log_seq++, 'MESSAGE', "Receive Complete [$opcode]");//, $data);	
 
-		            	// If we already handled this message, go receive a new one
-		            	if($message_handled) break;
+					// Handle special cases here
+	            	switch($opcode) {
+	            		case 'ping': // Respond with pong
+	            			echo "Sending Pong\n----------\n";
+	            			DataLoadLogDAO::logEvent2($this->db, $func_log_id, $log_seq++, 'INFO', "Sending pong message");	
 
-		            	try {
-		            		echo "Trying to decode string\r\n";
-		            		$decoded_data = @gzdecode($data);
-		            		if ($decoded_data == false) 
-		            			echo "String not compressed\r\n";
-		            		else {
-		            			$data = $decoded_data;
-		            			
-		            			echo "DECODED: [$data]\r\n\r\n";
-								DataLoadLogDAO::logEvent2($this->db, $func_log_id, $log_seq++, 'INFO', "Decoded [$opcode] message", $data);	
+	            			$this->client->send('', 'pong');
+	            			$message_handled = true;
+	            			break;
+	            		case 'close':
+	            			echo "Received Close.  Disconnecting...\n";
+	            			DataLoadLogDAO::logEvent2($this->db, $func_log_id, $log_seq++, 'INFO', "Sending pong message");	
 
-		            		}
-		            	} 
-		            	catch (Exception $ex) {
-		            		echo "Error\r\n";
-		            	}
+	            			$message_handled = true;
+	            			$closed = true;
+	            			break;
+	            	}
 
-						
-					} 
-					catch (Exception $ex) {
-						echo "No Data Found\r\n";
-						DataLoadLogDAO::logEvent2($this->db, $func_log_id, $log_seq++, 'ERROR', "No Data Found [$opcode]", $ex->getMessage(), 1);	
-						break;
-					}
+	            	// If we already handled this message, go receive a new one
+	            	if($message_handled) break;
+
+	            	try {
+	            		echo "Trying to decode string\n";
+	            		$decoded_data = @gzdecode($data);
+	            		if ($decoded_data == false) {
+	            			echo "String not compressed\n$data\n==========\n";
+	            			DataLoadLogDAO::logEvent2($this->db, $func_log_id, $log_seq++, 'MESSAGE', "[$opcode] Message Not Compressed", $data);	
+	            		}
+	            		else {
+	            			$data = $decoded_data;
+	            			
+	            			echo "DECODED:\n$data\n==========\n";
+							DataLoadLogDAO::logEvent2($this->db, $func_log_id, $log_seq++, 'MESSAGE', "Decoded [$opcode] message", $data);	
+	            		}
+	            	} 
+	            	catch (Exception $ex) {
+	            		echo "Error\n";
+	            	}
+				} 
+				catch (Exception $ex) {
+					echo "No Data Found\n";
+					DataLoadLogDAO::logEvent2($this->db, $func_log_id, $log_seq++, 'ERROR', "No Data Found [$opcode]", $ex->getMessage(), 1);
+					//usleep(5000000);
+					//break;
 				}
-	        }
+			}
+	        //}
+
+	        if($closed)
+        		break;
         }
 
 		DataLoadLogDAO::completeFunction($this->db, $func_log_id, 'Finished with Listener, this should never happen');
