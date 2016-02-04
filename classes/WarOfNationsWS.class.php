@@ -172,6 +172,9 @@ class WarOfNationsWS {
 						
 						return false;
 					}
+
+					// Validate that the request completed successfully
+					$this->ValidateResponse($json_array, $func_log_id, $response_id);
 					
 					DataLoadLogDAO::logWebserviceResponse($this->db, $func_log_id, $response_string, $request_time, $json_array);
 					DataLoadLogDAO::completeFunction($this->db, $func_log_id, 'Request Successful');
@@ -213,7 +216,15 @@ class WarOfNationsWS {
 
 		DataLoadLogDAO::logWebserviceResponse($this->db, $request_id, $decoded, $request_time, $json_array);
 		
-		// Validate the the request completed successfully
+		// Validate that the request completed successfully
+		$this->ValidateResponse($json_array, $func_log_id, $response_id);
+
+		// Return the decoded string
+		return $json_array;
+	}
+
+	private function ValidateResponse($json_array, $func_log_id, $response_id) {
+		// Validate that the request completed successfully
 		if($json_array['status'] == 'OK' && $json_array['responses'][0]['status'] == 'OK')
 			DataLoadLogDAO::completeFunction($this->db, $func_log_id, 'Request Successful');
 		else {
@@ -223,9 +234,6 @@ class WarOfNationsWS {
 			DataLoadDAO::loadFailed($this->db, $this->data_load_id);
 			die("Data Load Failed. $status_str");
 		}
-
-		// Return the decoded string
-		return $json_array;
 	}
 }
 ?>
