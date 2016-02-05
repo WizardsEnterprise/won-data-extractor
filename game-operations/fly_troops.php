@@ -124,6 +124,9 @@ while(true) {
 
 		usleep($seconds_to_sleep * 1000000);
 
+		// Have to reset first_run here or we're in trouble
+		$first_run = false;
+
 		// Go back to the top and try again
 		continue;
 	}
