@@ -24,6 +24,9 @@ $max_army_size = 1900; // Keep this the same across all bases
 $max_waves = 10;
 $preferred_distance = 700; // Use this to balance flight time
 
+$seconds_between_waves = 2;
+$seconds_between_bases = 5;
+
 // Order to fly troops out of base (most valuable first)
 $fly_order = array('Railgun Tank', 'Titan', 'Hellfire', 'Centurion', 'Hailstorm', 'Arachnid',
 				   'Hawk', 'Hammerhead', 'Rocket Truck', 'Transport', 'Bomber', 'Helicopter', 
@@ -209,13 +212,22 @@ while(true) {
 	// Keep list of time to destination/calculate arrival times (microtime)
 
 	foreach($bases as $base_id => $base) {
-		$wave_count = 1;
+		$wave_count = 0;
+
+		// If this base doesn't have a pairing, skip to the next one
+		if(!array_key_exists($base_id, $base_pairs)) 
+			continue;
+
 		echo "\n\n=================================\n";
 		print_r($base);
 		// Create up to max_waves waves at this base
 		while($wave_count <= $max_waves && array_sum($base['units']) > 0) {
 			$wave = array();
 			$total_units = 0;
+
+			// Increment the count of waves sent from this base
+			$wave_count++;
+
 			// Build a wave, starting with the slow unit (if available)
 			if(array_key_exists($slow_unit, $base['units']) && $base['units'][$slow_unit] > 0) {
 				$wave[$slow_unit] = 1;
@@ -225,8 +237,10 @@ while(true) {
 
 			// Loop through our units in designated flight order
 			foreach($fly_order as $unit) {
+				// Figure out how much space we have left on the wave
 				$space_remaining = $max_army_size - $total_units;
 
+				// If we're out of space, stop building this wave
 				if($space_remaining == 0) break;
 
 				// If this unit is available in this base, add it to the ave
@@ -244,33 +258,30 @@ while(true) {
 				}
 			}
 
-			// Increment the count of waves sent from this base
-			$wave_count++;
-
 			echo "Wave #$wave_count from {$base['name']}\n";
 			print_r($wave);
 			DataLoadLogDAO::logEvent2($won->db, $func_log_id, $log_seq++, 'INFO', "Wave #$wave_count from {$base['name']}", print_r($wave, true));	
 
-			// If this base has a pairing, send wave to designated target base
-			if(array_key_exists($base_id, $base_pairs)) {
-				$target_base_id = $base_pairs[$base_id];
-				$army = $game->SendArmyToTown($base_id, $target_base_id, $wave);
+			$target_base_id = $base_pairs[$base_id];
+			$army = $game->SendArmyToTown($base_id, $target_base_id, $wave);
 
-				// If we failed to send the wave, attempt to figure out why
-				if(!$army) {
-					die("Error\n");	
-				}
-
-				// Calculate our arrival time, and save the latest arrival to each base
-				$time_to_destination = $army['time_to_destination_ts'];
-				$arrival_time = $time_to_destination;
-
-				// If this base doesn't already have a flight going to it or this flight is arriving sooner, save it
-				if(!array_key_exists($target_base_id, $arrivals) || $arrivals[$target_base_id] < $arrival_time) {
-					$arrivals[$target_base_id] = $arrival_time;
-				}
+			// If we failed to send the wave, attempt to figure out why
+			if(!$army) {
+				die("Error\n");	
 			}
+
+			// Calculate our arrival time, and save the latest arrival to each base
+			$time_to_destination = $army['time_to_destination_ts'];
+			$arrival_time = $time_to_destination;
+
+			// If this base doesn't already have a flight going to it or this flight is arriving sooner, save it
+			if(!array_key_exists($target_base_id, $arrivals) || $arrivals[$target_base_id] < $arrival_time) {
+				$arrivals[$target_base_id] = $arrival_time;
+			}
+
+			usleep($seconds_between_waves * 1000000);
 		}
+		usleep($seconds_between_bases * 1000000);
 	}
 
 	// Sort list of arrival times
