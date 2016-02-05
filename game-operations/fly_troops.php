@@ -235,7 +235,10 @@ while(true) {
 					$units_sent = min($base['units'][$unit], $space_remaining);
 
 					// Add these units to the wave
-					$wave[$unit] += $units_sent;
+					if(array_key_exists($unit, $wave))
+						$wave[$unit] += $units_sent;
+					else
+						$wave[$unit] = $units_sent;
 					$base['units'][$unit] -= $units_sent;
 					$total_units += $units_sent;
 				}
@@ -288,6 +291,8 @@ while(true) {
 
 	$seconds_to_sleep = array_shift($arrivals) + 10;
 	echo "Waiting $seconds_to_sleep seconds for next wave to land";
+	DataLoadLogDAO::logEvent2($won->db, $func_log_id, $log_seq++, 'INFO', "Waiting $seconds_to_sleep seconds for next wave to land");	
+
 	usleep($seconds_to_sleep * 1000000);
 
 	// Not our first run anymore!
