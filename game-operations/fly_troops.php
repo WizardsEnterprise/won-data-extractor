@@ -122,6 +122,9 @@ while(true) {
 		echo "Only ".count($bases)." base(s) available, waiting $seconds_to_sleep seconds for next wave to land";
 		DataLoadLogDAO::logEvent2($won->db, $func_log_id, $log_seq++, 'INFO', "Only ".count($bases)." base(s) available, waiting $seconds_to_sleep seconds for next wave to land");	
 
+		if($seconds_to_sleep < 0)
+			die("Error: Time to Wait is less than 0.  Quitting.");
+
 		usleep($seconds_to_sleep * 1000000);
 
 		// Have to reset first_run here or we're in trouble
