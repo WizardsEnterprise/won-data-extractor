@@ -173,11 +173,10 @@ class WarOfNationsWS {
 						return false;
 					}
 
-					// Validate that the request completed successfully
-					$this->ValidateResponse($json_array, $func_log_id, $response_id);
+					DataLoadLogDAO::logWebserviceResponse($this->db, $request_id, $response_string, $request_time, $json_array);
 					
-					DataLoadLogDAO::logWebserviceResponse($this->db, $func_log_id, $response_string, $request_time, $json_array);
-					DataLoadLogDAO::completeFunction($this->db, $func_log_id, 'Request Successful');
+					// Validate that the request completed successfully
+					$this->ValidateResponse($json_array, $func_log_id, $request_id);
 
 					return $json_array;
 				}
@@ -217,13 +216,13 @@ class WarOfNationsWS {
 		DataLoadLogDAO::logWebserviceResponse($this->db, $request_id, $decoded, $request_time, $json_array);
 		
 		// Validate that the request completed successfully
-		$this->ValidateResponse($json_array, $func_log_id, $response_id);
+		$this->ValidateResponse($json_array, $func_log_id, $request_id);
 
 		// Return the decoded string
 		return $json_array;
 	}
 
-	private function ValidateResponse($json_array, $func_log_id, $response_id) {
+	private function ValidateResponse($json_array, $func_log_id, $request_id) {
 		// Validate that the request completed successfully
 		if($json_array['status'] == 'OK' && $json_array['responses'][0]['status'] == 'OK')
 			DataLoadLogDAO::completeFunction($this->db, $func_log_id, 'Request Successful');
@@ -232,7 +231,7 @@ class WarOfNationsWS {
 			DataLoadLogDAO::webServiceStatusFailure($this->db, $request_id);
 			DataLoadLogDAO::completeFunction($this->db, $func_log_id, "Request Failed.  $status_str", 1);
 			DataLoadDAO::loadFailed($this->db, $this->data_load_id);
-			die("Data Load Failed. $status_str");
+			die("Data Load Failed. $status_str\n");
 		}
 	}
 }

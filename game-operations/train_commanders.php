@@ -133,7 +133,7 @@ $time_before_recall_hold = 0;
 
 // Authenticate ourselves
 //$auth_result = json_decode(file_get_contents('auth_result.json'), true);
-$auth_result = $won->Authenticate(true); 
+$auth_result = $won->Authenticate(false, 5, true); 
 
 //print_r($auth_result['responses'][0]['return_value']['player_commanders']);
 
@@ -505,6 +505,6 @@ while(true){
 	$first = false;
 }
 
-DataLoadLogDAO::completeFunction($this->db, $func_log_id, 'Done Training');
+DataLoadLogDAO::completeFunction($won->db, $func_log_id, 'Done Training');
 DataLoadDAO::loadComplete($won->db, $won->data_load_id);
 ?>

@@ -44,10 +44,10 @@ class DataLoadLogDAO {
 		}
 
 		if($rows_updated > 1) 
-			echo "WARNING: More than 1 function log row updated! id = [$func_id]\r\n";
+			echo "WARNING: More than 1 function log row completed! id = [$func_id]\r\n";
 
 		if($rows_updated == 0) 
-			echo "WARNING: No function log rows updated! id = [$func_id]\r\n";
+			echo "WARNING: No function log rows completed! id = [$func_id]\r\n";
 
 		return $rows_updated;
 	}
@@ -123,7 +123,7 @@ class DataLoadLogDAO {
 			echo "WARNING: More than 1 web service log row updated! id = [$request_id]\r\n";
 
 		if($rows_updated == 0) 
-			echo "WARNING: No web service log rows updated! id = [$request_id]\r\n";
+			echo "WARNING: Could not complete web service request log! id = [$request_id]\r\n";
 
 		return $rows_updated;
 	}
@@ -141,10 +141,10 @@ class DataLoadLogDAO {
 		}
 
 		if($rows_updated > 1) 
-			echo "WARNING: More than 1 web service log row updated! id = [$request_id]\r\n";
+			echo "WARNING: More than 1 web service log status row updated! id = [$request_id]\r\n";
 
 		if($rows_updated == 0) 
-			echo "WARNING: No web service log rows updated! id = [$request_id]\r\n";
+			echo "WARNING: No web service log status rows updated! id = [$request_id]\r\n";
 
 		return $rows_updated;
 	}

@@ -14,9 +14,17 @@ class GameOperations {
 
 	// Unit Mapping
 	private static $unit_mapping = array('Jeep' => 1011, 
+										 'Tank' => 1009,
+										 'Arachnid' => 1015,
 										 'Helicopter' => 1003, 
-										 'Hailstorm' => 1017, 
-										 'Artillery' => 1004, 
+										 'Hailstorm' => 1017,
+										 'Rocket Truck' => 1006,
+										 'Hammerhead' => 1013,
+										 'Centurion' => 1016,
+										 'Hawk' => 1005, 
+										 'Artillery' => 1004,
+										 'Titan' => 1007,
+										 'Hellfire' => 1012, 
 										 'Railgun Tank' => 1002,
 										 'Transport' => 1008,
 										 'Bomber' => 1010);
@@ -33,6 +41,10 @@ class GameOperations {
 	
 	public function setDataLoadId($dlid) {
 		$this->data_load_id = $dlid;
+	}
+
+	public static function GetUnitMap() {
+		return array_flip(self::$unit_mapping);
 	}
 
 	public static function BuildAttackUnits($unit_list){
@@ -146,6 +158,47 @@ class GameOperations {
 		return $army;
 	}
 
+	public function sendArmyToTown($origin_town_id, $dest_town_id, $units) {
+		// [{"transaction_time":"$$transaction_time$$","platform":"$$device_platform$$","session_id":"$$session_id$$","start_sequence_num":1,"iphone_udid":"$$device_id$$","wd_player_id":0,"locale":"en-US","_explicitType":"Session","client_build":"$$client_build$$","game_name":"$$game_name$$","api_version":"$$api_version$$","mac_address":"$$mac_address$$","end_sequence_num":1,"req_id":1,"player_id":$$player_id$$,"language":"en","game_data_version":"$$game_data_version$$","client_version":"$$client_version$$"},[{"service":"army.army","method":"send_army_to_town","_explicitType":"Command","params":"params":[$$origin_town_id$$,$$units_json$$,$$dest_town_id$$]}]]
+		// [{"transaction_time":"1454601127816","platform":"android","session_id":"9148389","start_sequence_num":1,"iphone_udid":"77598b1411b9a04d868609fe9fb88ff6","wd_player_id":0,"locale":"en-US","_explicitType":"Session","client_build":"496","game_name":"HCGame","api_version":"1","mac_address":"14:10:9F:D6:7B:33","end_sequence_num":1,"req_id":1,"player_id":101013866213677,"language":"en","game_data_version":"hc_NA_20160203_64852","client_version":"4.0.0"},[{"service":"army.army","method":"send_army_to_town","_explicitType":"Command","params":[1,[{"amount":1,"_explicitType":"units.PlayerUnit","unit_id":1011},{"amount":2,"_explicitType":"units.PlayerUnit","unit_id":1009},{"amount":3,"_explicitType":"units.PlayerUnit","unit_id":1015},{"amount":4,"_explicitType":"units.PlayerUnit","unit_id":1003},{"amount":5,"_explicitType":"units.PlayerUnit","unit_id":1017},{"amount":6,"_explicitType":"units.PlayerUnit","unit_id":1006},{"amount":7,"_explicitType":"units.PlayerUnit","unit_id":1013},{"amount":8,"_explicitType":"units.PlayerUnit","unit_id":1016},{"amount":9,"_explicitType":"units.PlayerUnit","unit_id":1005},{"amount":10,"_explicitType":"units.PlayerUnit","unit_id":1004},{"amount":11,"_explicitType":"units.PlayerUnit","unit_id":1007},{"amount":12,"_explicitType":"units.PlayerUnit","unit_id":1012},{"amount":13,"_explicitType":"units.PlayerUnit","unit_id":1002}],2]}]]
+
+		$log_seq = 0;
+		$func_args = func_get_args();
+		$func_log_id = DataLoadLogDAO::startFunction($this->db, $this->data_load_id, __CLASS__,  __FUNCTION__, $func_args);
+
+		echo "Sending Army to Town...\r\n";
+
+		$params = array();
+		$params['origin_town_id'] = $origin_town_id;
+		$params['units_json'] = json_encode(self::BuildAttackUnits($units), true);
+		$params['dest_town_id'] = $dest_town_id;
+
+		$result = $this->de->MakeRequest('SEND_ARMY_TO_TOWN', $params);
+		if(!$result) return false;
+
+		$success = $result['responses'][0]['return_value']['success'];
+
+		if($success != 1){
+			$reason = $result['responses'][0]['return_value']['reason'];
+			echo "Failed to send army to town: [$reason]\r\n";
+
+			DataLoadLogDAO::completeFunction($this->db, $func_log_id, "Failed to send army to town: $reason", 1);
+
+			return false;
+		}
+
+		$army = $result['responses'][0]['return_value']['player_army'];
+
+		$time_to_dest = $army['delta_time_to_destination'];
+		$army_id = $army['id'];
+
+		$log_msg = "Army en route.  Army $army_id lands at base $dest_town_id in $time_to_dest seconds.";
+		echo "$log_msg\n";
+
+		DataLoadLogDAO::completeFunction($this->db, $func_log_id, $log_msg);
+		return $army;
+	}
+
 	public function recallArmy($army_id) {
 		//[{"transaction_time":"$$transaction_time$$","platform":"$$device_platform$$","session_id":"$$session_id$$","start_sequence_num":1,"iphone_udid":"$$device_id$$","wd_player_id":0,"locale":"en-US","_explicitType":"Session","client_build":"$$client_build$$","game_name":"$$game_name$$","api_version":"$$api_version$$","mac_address":"$$mac_address$$","end_sequence_num":1,"req_id":1,"player_id":$$player_id$$,"language":"en","game_data_version":"$$game_data_version$$","client_version":"$$client_version$$"},[{"service":"army.army","method":"send_army_to_attack","_explicitType":"Command","params":[$$army_id$$]}]]
 
@@ -168,7 +221,7 @@ class GameOperations {
 			$reason = $result['responses'][0]['return_value']['reason'];
 			echo "Failed to recall army. [$reason]\r\n";
 
-			DataLoadLogDAO::completeFunction($this->db, $func_log_id, 'Failed to recall army: $reason', 1);
+			DataLoadLogDAO::completeFunction($this->db, $func_log_id, "Failed to recall army: $reason", 1);
 
 			return $reason;
 		}
