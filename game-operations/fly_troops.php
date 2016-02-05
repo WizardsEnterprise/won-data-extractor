@@ -54,6 +54,14 @@ $log_seq = 0;
 $func_log_id = DataLoadLogDAO::startFunction($won->db, $won->data_load_id, 'FlyTroops', 'Main');
 
 while(true) {
+	// Check configuration to make sure we aren't supposed to stop - this is the kill switch
+	$stop = PgrmConfigDAO::getConfigProperty($won->db, 'value1', 'STOP_TROOP_FLYER');
+	if($stop == 'Y') {
+		echo "Stop Signal Detected!\n";
+		DataLoadLogDAO::logEvent2($won->db, $func_log_id, $log_seq++, 'INFO', 'Stop Signal Detected!');	
+		break;
+	}
+
 	// Setup our lists
 	$bases = array();
 	$base_distances = array();

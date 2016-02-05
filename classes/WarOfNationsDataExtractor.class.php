@@ -75,6 +75,12 @@ class WarOfNationsDataExtractor {
 		// Get our request properties from the database
 		if (!in_array($method, $this->request_cache)) {
 			$request = ServiceRequestDAO::getServiceRequestByMethod($this->db, $method);
+
+			if(!$request) {
+				echo "Invalid Method: No Request Found.\n";
+				return false;
+			}
+
 			$this->request_cache[$method] = $request;
 		} else {
 			$request = $this->request_cache[$method];
@@ -85,11 +91,6 @@ class WarOfNationsDataExtractor {
 		
 		// Call the webservice
 		$response = $this->ws->MakeRequest($request['endpoint'], $data_string, $method);
-
-		// TODO: Ungzip here
-
-
-		// TODO: JSON Decode
 
 		return $response;
 
