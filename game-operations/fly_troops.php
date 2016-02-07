@@ -104,8 +104,10 @@ while(true) {
 			$time_to_destination = $army['time_to_destination_ts'];
 			$arrival_time = $time_to_destination;
 
-			// Safe this arrival into our arrivals list
-			$arrivals[$army['town_id']] = $arrival_time;
+			// Safe this arrival into our arrivals list, maybe
+			if(!array_key_exists($target_base_id, $arrivals) || $arrivals[$target_base_id] < $arrival_time) {
+				$arrivals[$army['town_id']] = $arrival_time;
+			}
 
 			// Exclude this base from our flight program
 			if(array_key_exists($army['town_id'], $bases))
@@ -113,10 +115,13 @@ while(true) {
 		}
 	}
 
+	// Sort our arrival list in order of soonest to land
+	asort($arrivals);
+
 	print_r($arrivals);
 	print_r($bases);
 
-	DataLoadLogDAO::logEvent2($won->db, $func_log_id, $log_seq++, 'INFO', 'Base Arrival Times: ['.count($arrivals).']', print_r($arrivals, true));
+	DataLoadLogDAO::logEvent2($won->db, $func_log_id, $log_seq++, 'INFO', 'Base Arrival Times: ['.count($arrivals).']', 'Current time: '.time()."\n".print_r($arrivals, true));
 	DataLoadLogDAO::logEvent2($won->db, $func_log_id, $log_seq++, 'INFO', 'Bases to Fly: ['.count($bases).']', print_r($bases, true));	
 
 	// If we don't have a pair of bases available to fly to/from, wait for another base to be ready
@@ -131,7 +136,7 @@ while(true) {
 		// Wait for the next wave to land
 		$seconds_to_sleep = array_shift($arrivals) + 10;
 		echo "Only ".count($bases)." base(s) available, waiting $seconds_to_sleep seconds for next wave to land";
-		DataLoadLogDAO::logEvent2($won->db, $func_log_id, $log_seq++, 'INFO', "Only ".count($bases)." base(s) available, waiting $seconds_to_sleep seconds for next wave to land");	
+		DataLoadLogDAO::logEvent2($won->db, $func_log_id, $log_seq++, 'INFO', "Only ".count($bases)." base(s) available, waiting $seconds_to_sleep seconds for next wave to land", print_r($arrivals, true));	
 
 		if($seconds_to_sleep < 0)
 			die("Error: Time to Wait is less than 0.  Quitting.");
@@ -281,6 +286,10 @@ while(true) {
 
 			usleep($seconds_between_waves * 1000000);
 		}
+		// Log an operation complete after each base flown
+		DataLoadDAO::operationComplete($won->db, $won->data_load_id);
+
+		// Pause shortly
 		usleep($seconds_between_bases * 1000000);
 	}
 
