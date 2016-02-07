@@ -3,15 +3,8 @@ require_once(dirname(__FILE__) . '/../classes/WarOfNations2.class.php');
 require_once(dirname(__FILE__) . '/../classes/data/DataLoad.class.php');
 
 /*************** Helper Functions ***************/
-function base_pair_sort($a, $b) {
-    if ($a['over_minimum'] == $b['over_minimum']) {
-        return 0;
-    }
-    return ($a['over_minimum'] < $b['over_minimum']) ? -1 : 1;
-}
-
 // Sort the base list in order of most recently attacked
-function base_priority_sort($a, $b) {
+function base_sort_last_attacked($a, $b) {
     if ($a['time_last_attacked_ts'] == $b['time_last_attacked_ts']) {
         return 0;
     }
@@ -77,7 +70,9 @@ while(true) {
 	}
 
 	/*************** Gather Base/Troop Info ***************/
-	// Setup base information
+	// Gather base information
+	//  We'll use the coordinates later to calculate the distances between bases, 
+	//  and the time last attacked to determine the other of bases to fly troops from.
 	foreach($auth_result['responses'][0]['return_value']['player_towns'] as $base) {
 		$bases[$base['id']] = array('name' => $base['display_name'],
 									'hex_x' => $base['hex_x'],
@@ -87,9 +82,9 @@ while(true) {
 	}
 
 	// Sort the bases in priority order (will sort by last time attacked)
-	uasort($bases, 'base_priority_sort');
+	uasort($bases, 'base_sort_last_attacked');
 
-	// Add available troop information to bases
+	// Fill in the units currently available at each base so that we can fly them
 	foreach($auth_result['responses'][0]['return_value']['player_town_reserves'] as $reserve) {
 		$bases[$reserve['town_id']]['units'] = array();
 		foreach($reserve['units'] as $unit) {
@@ -97,14 +92,17 @@ while(true) {
 		}
 	}
 
-	// Exclude bases that we have troops flying to currently
+	// Find the bases that currently have troops flying to them, and exclude flying these bases
+	// until all of the troops have arrived.
+	// Save the arrival time(s) so that we can use it later.
 	foreach($auth_result['responses'][0]['return_value']['player_deployed_armies'] as $army) {
 		// Make sure the target is one of our bases, or it's a returning army
 		if($army['target_player_id'] == $won->auth->player_id || $army['is_returning_home'] == 1) {
 			$time_to_destination = $army['time_to_destination_ts'];
 			$arrival_time = $time_to_destination;
 
-			// Safe this arrival into our arrivals list, maybe
+			// Save this arrival into our arrivals list
+			// Make sure we save the latest arrival time to each base so that everything has a chance to land
 			if(!array_key_exists($target_base_id, $arrivals) || $arrivals[$target_base_id] < $arrival_time) {
 				$arrivals[$army['town_id']] = $arrival_time;
 			}
@@ -133,15 +131,15 @@ while(true) {
 			$arrivals[$index] = $arrival_ts - $current_ts;
 		}
 
-		// Record the relative times
+		// Log the relative arrival times
 		DataLoadLogDAO::logEvent2($won->db, $func_log_id, $log_seq++, 'INFO', 'Relative Base Arrival Times: ['.count($arrivals).']', print_r($arrivals, true));
 
-		// Wait for the next wave to land
+		// Wait for the next wave to land, add 10 seconds for safety
 		$seconds_to_sleep = array_shift($arrivals) + 10;
 		echo "Only ".count($bases)." base(s) available, waiting $seconds_to_sleep seconds for next wave to land";
 		DataLoadLogDAO::logEvent2($won->db, $func_log_id, $log_seq++, 'INFO', "Only ".count($bases)." base(s) available, waiting $seconds_to_sleep seconds for next wave to land");	
 
-		
+		// This should never happen
 		if($seconds_to_sleep < 0)
 			die("Error: Time to Wait is less than 0.  Quitting.");
 
@@ -164,27 +162,27 @@ while(true) {
 			// This isn't exact but gets pretty close
 			$distance = sqrt(pow(($baseA['hex_x'] + $baseA['hex_y']/2) - ($baseB['hex_x'] + $baseB['hex_y']/2), 2) + pow($baseA['hex_y'] - $baseB['hex_y'], 2));
 
+			// Store the distance between this pair of bases
 			$base_distances[$base_idA][$base_idB] = $distance;
-			//$over_minimum += ($distance >= $preferred_distance) ? 1 : 0;
 		}
-		// Sort the flight options from shortest to longest distance
+
+		// Sort the flight options for this base from shortest to longest distance
 		asort($base_distances[$base_idA]);
-
-		// Save the value for number of bases over the preferred/minimum distance
-		//$base_distances[$base_idA]['over_minimum'] = $over_minimum;
 	}
-
-	//print_r($base_pairs);
-
-	// Sort the base pairs in order of how many options we have for flying
-	//uasort($base_distances, 'base_pair_sort');
 
 	print_r($base_distances);
 	DataLoadLogDAO::logEvent2($won->db, $func_log_id, $log_seq++, 'INFO', 'Base Distances: ['.count($base_distances).']', print_r($base_distances, true));	
 
-	// Bases will be paired off starting with the base with the fewer options
-	// Selected flight path will be the closest base over the preferred distance
+	// Bases will be paired off starting with the base that has been attacked most recently
+	//  This is done just in case we have an odd number of flight paths currently available
+	//  The base that hasn't been attacked in the longest time will be left sitting
+	//  Decided this was less risky that potentially sending 20 waves to the same base
 
+	// Selected flight path will be the closest base over the preferred distance
+	//  We do this to preserve the longest flight paths (ie. to Homebase) are saved for bases
+	//  that lack other reasonable options
+
+	// Need this to decide when we're done pairing bases (so that we don't "pair" an odd number)
 	$odd_number_fix = count($bases) % 2;
 	foreach($base_distances as $base_idA => $base_distance_list) {
 		// If there is already a match for this base, move on to the next one
@@ -216,10 +214,10 @@ while(true) {
 
 	/***************** Actually Fly Troops ********************/
 
-	// Iterate through bases
-	// Fly troops, starting with most expensive, each wave including 1 artillery for speed
-	// Keep list of time to destination/calculate arrival times (microtime)
-
+	// Iterate through bases, in sorted order by most recently attacked
+	// Fly troops, starting with most expensive, each wave including 1 slow unit (artillery) for speed
+	// Keep list of each time to destination so that we can determine how long to wait until
+	//  waking up to fly more troops again
 	foreach($bases as $base_id => $base) {
 		$wave_count = 0;
 
@@ -262,7 +260,11 @@ while(true) {
 						$wave[$unit] += $units_sent;
 					else
 						$wave[$unit] = $units_sent;
+
+					// Decrement available units in the base
 					$base['units'][$unit] -= $units_sent;
+
+					// Increment the total units sent in this wave
 					$total_units += $units_sent;
 				}
 			}
@@ -271,10 +273,13 @@ while(true) {
 			print_r($wave);
 			DataLoadLogDAO::logEvent2($won->db, $func_log_id, $log_seq++, 'INFO', "Wave #$wave_count from {$base['name']}", print_r($wave, true));	
 
+			// Look up which base to send these units to
 			$target_base_id = $base_pairs[$base_id];
+
+			// Send the units 
 			$army = $game->SendArmyToTown($base_id, $target_base_id, $wave);
 
-			// If we failed to send the wave, attempt to figure out why
+			// If we failed to send the wave, stop, and attempt to figure out why
 			if(!$army) {
 				die("Error\n");	
 			}
@@ -288,6 +293,7 @@ while(true) {
 				$arrivals[$target_base_id] = $arrival_time;
 			}
 
+			// Wait for a little bit
 			usleep($seconds_between_waves * 1000000);
 		}
 		// Log an operation complete after each base flown
@@ -297,9 +303,7 @@ while(true) {
 		usleep($seconds_between_bases * 1000000);
 	}
 
-	// Sort list of arrival times
-	// Sleep for the shortest required time
-	// Sort our arrival list
+	// Sort list of arrival times so that we can easily find the shortest
 	asort($arrivals);
 
 	// Turn the arrivals list back into actual time deltas
@@ -312,11 +316,12 @@ while(true) {
 	print_r($arrivals);
 
 	DataLoadLogDAO::logEvent2($won->db, $func_log_id, $log_seq++, 'INFO', 'Arrivals After Sending: ['.count($arrivals).']', print_r($arrivals, true));	
-
+	
 	$seconds_to_sleep = array_shift($arrivals) + 10;
 	echo "Waiting $seconds_to_sleep seconds for next wave to land";
 	DataLoadLogDAO::logEvent2($won->db, $func_log_id, $log_seq++, 'INFO', "Waiting $seconds_to_sleep seconds for next wave to land");	
 
+	// Wait for the next wave to land before we wake back up
 	usleep($seconds_to_sleep * 1000000);
 
 	// Not our first run anymore!
