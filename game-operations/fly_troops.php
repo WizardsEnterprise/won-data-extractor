@@ -103,7 +103,7 @@ while(true) {
 			
 			// If the army is returning, use the base ID of the sending base
 			if($army['is_returning_home'] == 1)
-				$target_base_id = $arrivals[$army['town_id']]
+				$target_base_id = $arrivals[$army['town_id']];
 			else
 				$target_base_id = $arrivals[$army['target_town_id']];
 
