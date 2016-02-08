@@ -228,7 +228,7 @@ while(true) {
 		echo "\n\n=================================\n";
 		print_r($base);
 		// Create up to max_waves waves at this base
-		while($wave_count <= $max_waves && array_sum($base['units']) > 0) {
+		while($wave_count < $max_waves && array_sum($base['units']) > 0) {
 			$wave = array();
 			$total_units = 0;
 
@@ -316,7 +316,7 @@ while(true) {
 	print_r($arrivals);
 
 	DataLoadLogDAO::logEvent2($won->db, $func_log_id, $log_seq++, 'INFO', 'Arrivals After Sending: ['.count($arrivals).']', print_r($arrivals, true));	
-	
+
 	$seconds_to_sleep = array_shift($arrivals) + 10;
 	echo "Waiting $seconds_to_sleep seconds for next wave to land";
 	DataLoadLogDAO::logEvent2($won->db, $func_log_id, $log_seq++, 'INFO', "Waiting $seconds_to_sleep seconds for next wave to land");	
