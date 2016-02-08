@@ -97,12 +97,12 @@ while(true) {
 	// Save the arrival time(s) so that we can use it later.
 	foreach($auth_result['responses'][0]['return_value']['player_deployed_armies'] as $army) {
 		// Make sure the target is one of our bases, or it's a returning army
-		if($army['target_player_id'] == $won->auth->player_id || $army['is_returning_home'] == 1) {
+		if($army['target_player_id'] == $won->auth->player_id || (array_key_exists('is_returning_home', $army) && $army['is_returning_home'] == 1)) {
 			$time_to_destination = $army['time_to_destination_ts'];
 			$arrival_time = $time_to_destination;
 			
 			// If the army is returning, use the base ID of the sending base
-			if($army['is_returning_home'] == 1)
+			if((array_key_exists('is_returning_home', $army) && $army['is_returning_home'] == 1))
 				$target_base_id = $arrivals[$army['town_id']];
 			else
 				$target_base_id = $arrivals[$army['target_town_id']];
