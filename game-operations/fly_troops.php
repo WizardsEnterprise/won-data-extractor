@@ -100,16 +100,22 @@ while(true) {
 		if($army['target_player_id'] == $won->auth->player_id || $army['is_returning_home'] == 1) {
 			$time_to_destination = $army['time_to_destination_ts'];
 			$arrival_time = $time_to_destination;
+			
+			// If the army is returning, use the base ID of the sending base
+			if($army['is_returning_home'] == 1)
+				$target_base_id = $arrivals[$army['town_id']]
+			else
+				$target_base_id = $arrivals[$army['target_town_id']];
 
 			// Save this arrival into our arrivals list
 			// Make sure we save the latest arrival time to each base so that everything has a chance to land
 			if(!array_key_exists($target_base_id, $arrivals) || $arrivals[$target_base_id] < $arrival_time) {
-				$arrivals[$army['town_id']] = $arrival_time;
+				$arrivals[$target_base_id] = $arrival_time;
 			}
 
 			// Exclude this base from our flight program
-			if(array_key_exists($army['town_id'], $bases))
-				unset($bases[$army['town_id']]);
+			if(array_key_exists($target_base_id, $bases))
+				unset($bases[$target_base_id]);
 		}
 	}
 
