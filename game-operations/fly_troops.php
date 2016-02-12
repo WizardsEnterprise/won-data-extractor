@@ -2,6 +2,8 @@
 require_once(dirname(__FILE__) . '/../classes/WarOfNations2.class.php');
 require_once(dirname(__FILE__) . '/../classes/data/DataLoad.class.php');
 
+set_time_limit(0);
+
 /*************** Helper Functions ***************/
 // Sort the base list in order of most recently attacked
 function base_sort_last_attacked($a, $b) {
@@ -12,19 +14,23 @@ function base_sort_last_attacked($a, $b) {
 }
 
 /*************** Initialize Settings ***************/
+$device_id = false;
 $first_run = true;
-$max_army_size = 1900; // Keep this the same across all bases
-$max_waves = 10;
-$preferred_distance = 700; // Use this to balance flight time
+$max_army_size = 1900; // Keep this the same across all bases.  Minimum of all bases' army size
+$max_waves = 10; // Max number of waves that can be sent from 1 base
+$preferred_distance = 700; // Preferred flight distance, use this to balance flight time
 
+// Timing Settings
 $seconds_between_waves = 2;
 $seconds_between_bases = 5;
+$hours_between_sessions = 6;
 
 // Order to fly troops out of base (most valuable first)
 $fly_order = array('Railgun Tank', 'Titan', 'Hellfire', 'Centurion', 'Hailstorm', 'Arachnid',
 				   'Hawk', 'Hammerhead', 'Rocket Truck', 'Transport', 'Bomber', 'Helicopter', 
 				   'Tank', 'Jeep', 'Artillery');
 
+// Unit to use for ensuring all waves travel the same speed
 $slow_unit = 'Artillery';
 
 /*************** Program Setup ***************/
@@ -35,8 +41,14 @@ $won = new WarOfNations();
 $won->setDataLoadId(DataLoadDAO::initNewLoad($won->db, 'FLY_TROOPS', 0));
 DataLoadDAO::startLoad($won->db, $won->data_load_id);
 
+// Get the Device ID to use (main account)
+if($device_id == false) {
+	$device_id = PgrmConfigDAO::getConfigProperty($won->db, 'value1', 'MAIN_DEVICE_ID');
+}
+
 // Authenticate
-$auth_result = $won->Authenticate(false, 5, true); 
+$auth_result = $won->Authenticate(false, $device_id, true); 
+$last_session_time = time();
 //$auth_result = json_decode(file_get_contents('auth_result.json'), true);
 
 //print_r($auth_result['responses'][0]['return_value']['player_towns']);
@@ -58,16 +70,35 @@ while(true) {
 		break;
 	}
 
-	// Setup our lists
+	// If enough time has passed, start out with a new session
+	if((time() - $last_session_time) > ($hours_between_sessions * 60 * 60)) {
+		DataLoadLogDAO::logEvent2($won->db, $func_log_id, $log_seq++, 'INFO', "At least $hours_between_sessions hour(s) have passed. Starting new session.\n");	
+
+		// Save the data load for later, we don't want a new one
+		$data_load_id = $won->data_load_id;
+
+		// Re-initialize the WarOfNations object
+		unset($won);
+		$won = new WarOfNations();
+
+		// Set the data load back
+		$won->setDataLoadId($data_load_id);
+
+		// Reauthenticate to start a new session
+		$auth_result = $won->Authenticate(false, $device_id, true); 
+		$last_session_time = time();
+	} else {
+		// Otherwise, if this isn't the first run, call player sync to get updated information
+		if(!$first_run) {
+			$auth_result = $game->SyncPlayer();
+		}
+	}
+
+	// Setup/clear out our lists
 	$bases = array();
 	$base_distances = array();
 	$base_pairs = array();
-	$arrivals = array();
-
-	// If this isn't the first run, call player sync to get updated information
-	if(!$first_run) {
-		$auth_result = $game->SyncPlayer();
-	}
+	$flights = array();
 
 	/*************** Gather Base/Troop Info ***************/
 	// Gather base information
@@ -92,64 +123,77 @@ while(true) {
 		}
 	}
 
-	// Find the bases that currently have troops flying to them, and exclude flying these bases
-	// until all of the troops have arrived.
-	// Save the arrival time(s) so that we can use it later.
+	// Find the bases that currently have troops flying to/from them, and exclude these bases
+	// Program can have unpredictable behavior if we try to fly trrops from these bases before all waves have landed
+	// Save the arrival time so that we can use ithem later.
 	foreach($auth_result['responses'][0]['return_value']['player_deployed_armies'] as $army) {
 		// Make sure the target is one of our bases, or it's a returning army
 		if($army['target_player_id'] == $won->auth->player_id || (array_key_exists('is_returning_home', $army) && $army['is_returning_home'] == 1)) {
 			$time_to_destination = $army['time_to_destination_ts'];
 			$arrival_time = $time_to_destination;
 			
-			// If the army is returning, use the base ID of the sending base
-			if((array_key_exists('is_returning_home', $army) && $army['is_returning_home'] == 1))
-				$target_base_id = $army['town_id'];
-			else
+			// If the army is returning, only use the base ID of the sending base
+			if((array_key_exists('is_returning_home', $army) && $army['is_returning_home'] == 1)) {
+				$sending_base_id = $army['town_id'];
+				$target_base_id = false;
+			} else {
+			// Otherwise, use both base IDs so that we don't do something stupid
+				$sending_base_id = $army['town_id'];
 				$target_base_id = $army['target_town_id'];
-
-			// Save this arrival into our arrivals list
-			// Make sure we save the latest arrival time to each base so that everything has a chance to land
-			if(!array_key_exists($target_base_id, $arrivals) || $arrivals[$target_base_id] < $arrival_time) {
-				$arrivals[$target_base_id] = $arrival_time;
 			}
 
-			// Exclude this base from our flight program
-			if(array_key_exists($target_base_id, $bases))
-				unset($bases[$target_base_id]);
+			// Save this trip into our flights list for both bases and remove both bases from list to fly
+			// Make sure we save the latest arrival/departure time for each base so that everything has a chance to land
+
+			// We always have a sending base, so handle these first
+			if(!array_key_exists($sending_base_id, $flights) || $flights[$sending_base_id] < $arrival_time)
+				$flights[$sending_base_id] = $arrival_time;
+
+			if(array_key_exists($sending_base_id, $bases))
+				unset($bases[$sending_base_id]);
+
+			// If the wave is not on its return trip, handle the target base as well
+			if($target_base_id !== false) {
+				if(!array_key_exists($target_base_id, $flights) || $flights[$target_base_id] < $arrival_time) 
+					$flights[$target_base_id] = $arrival_time;
+
+				if(array_key_exists($target_base_id, $bases))
+					unset($bases[$target_base_id]);
+			}
 		}
 	}
 
-	// Sort our arrival list in order of soonest to land
-	asort($arrivals);
+	// Sort our flight list in order of soonest to land
+	asort($flights);
 
-	print_r($arrivals);
+	print_r($flights);
 	print_r($bases);
 
-	DataLoadLogDAO::logEvent2($won->db, $func_log_id, $log_seq++, 'INFO', 'Base Arrival Times: ['.count($arrivals).']', 'Current time: '.time()."\n".print_r($arrivals, true));
+	DataLoadLogDAO::logEvent2($won->db, $func_log_id, $log_seq++, 'INFO', 'Base Arrival Times: ['.count($flights).']', 'Current time: '.time()."\n".print_r($flights, true));
 	DataLoadLogDAO::logEvent2($won->db, $func_log_id, $log_seq++, 'INFO', 'Bases to Fly: ['.count($bases).']', print_r($bases, true));	
 
 	// If we don't have a pair of bases available to fly to/from, wait for another base to be ready
 	if(count($bases) < 2) {
-		// Turn the arrivals list back into actual time deltas
+		// Turn the flights list back into actual time deltas
 		// We do this here instead of storing deltas above to account for delays in sending flights
 		$current_ts = time();
-		foreach($arrivals as $index => $arrival_ts) {
-			$arrivals[$index] = $arrival_ts - $current_ts;
+		foreach($flights as $index => $arrival_ts) {
+			$flights[$index] = $arrival_ts - $current_ts;
 		}
 
 		// Log the relative arrival times
-		DataLoadLogDAO::logEvent2($won->db, $func_log_id, $log_seq++, 'INFO', 'Relative Base Arrival Times: ['.count($arrivals).']', print_r($arrivals, true));
+		DataLoadLogDAO::logEvent2($won->db, $func_log_id, $log_seq++, 'INFO', 'Relative Base Flight Times: ['.count($flights).']', print_r($flights, true));
 
 		// Wait for the next wave to land, add 10 seconds for safety
-		$seconds_to_sleep = array_shift($arrivals) + 10;
-		echo "Only ".count($bases)." base(s) available, waiting $seconds_to_sleep seconds for next wave to land";
+		$seconds_to_sleep = array_shift($flights) + 10;
+		echo "Only ".count($bases)." base(s) available, waiting $seconds_to_sleep seconds for next wave to land\n\n";
 		DataLoadLogDAO::logEvent2($won->db, $func_log_id, $log_seq++, 'INFO', "Only ".count($bases)." base(s) available, waiting $seconds_to_sleep seconds for next wave to land");	
 
 		// This should never happen
 		if($seconds_to_sleep < 0)
-			die("Error: Time to Wait is less than 0.  Quitting.");
+			die("Error: Time to Wait is less than 0.  Quitting.\n\n");
 
-		usleep($seconds_to_sleep * 1000000);
+		sleep($seconds_to_sleep);
 
 		// Have to reset first_run here or we're in trouble
 		$first_run = false;
@@ -287,48 +331,53 @@ while(true) {
 
 			// If we failed to send the wave, stop, and attempt to figure out why
 			if(!$army) {
-				die("Error\n");	
+				die("Error Detected. Quitting.\n\n");	
 			}
 
 			// Calculate our arrival time, and save the latest arrival to each base
 			$time_to_destination = $army['time_to_destination_ts'];
 			$arrival_time = $time_to_destination;
 
+			// If the sending base doesn't already have a flight leaving it or this flight is arriving sooner, save it
+			if(!array_key_exists($base_id, $flights) || $flights[$base_id] < $arrival_time) {
+				$flights[$base_id] = $arrival_time;
+			}
+
 			// If this base doesn't already have a flight going to it or this flight is arriving sooner, save it
-			if(!array_key_exists($target_base_id, $arrivals) || $arrivals[$target_base_id] < $arrival_time) {
-				$arrivals[$target_base_id] = $arrival_time;
+			if(!array_key_exists($target_base_id, $flights) || $flights[$target_base_id] < $arrival_time) {
+				$flights[$target_base_id] = $arrival_time;
 			}
 
 			// Wait for a little bit
-			usleep($seconds_between_waves * 1000000);
+			sleep($seconds_between_waves);
 		}
 		// Log an operation complete after each base flown
 		DataLoadDAO::operationComplete($won->db, $won->data_load_id);
 
 		// Pause shortly
-		usleep($seconds_between_bases * 1000000);
+		sleep($seconds_between_bases);
 	}
 
-	// Sort list of arrival times so that we can easily find the shortest
-	asort($arrivals);
+	// Sort list of flight times so that we can easily find the shortest
+	asort($flights);
 
-	// Turn the arrivals list back into actual time deltas
+	// Turn the flights list back into actual time deltas
 	// We do this here instead of storing them above to account for delays in sending flights
 	$current_ts = time();
-	foreach($arrivals as $index => $arrival_ts) {
-		$arrivals[$index] = $arrival_ts - $current_ts;
+	foreach($flights as $index => $arrival_ts) {
+		$flights[$index] = $arrival_ts - $current_ts;
 	}
 
-	print_r($arrivals);
+	print_r($flights);
 
-	DataLoadLogDAO::logEvent2($won->db, $func_log_id, $log_seq++, 'INFO', 'Arrivals After Sending: ['.count($arrivals).']', print_r($arrivals, true));	
+	DataLoadLogDAO::logEvent2($won->db, $func_log_id, $log_seq++, 'INFO', 'Flights After Sending: ['.count($flights).']', print_r($flights, true));	
 
-	$seconds_to_sleep = array_shift($arrivals) + 10;
-	echo "Waiting $seconds_to_sleep seconds for next wave to land";
+	$seconds_to_sleep = array_shift($flights) + 10;
+	echo "Waiting $seconds_to_sleep seconds for next wave to land\n\n";
 	DataLoadLogDAO::logEvent2($won->db, $func_log_id, $log_seq++, 'INFO', "Waiting $seconds_to_sleep seconds for next wave to land");	
 
 	// Wait for the next wave to land before we wake back up
-	usleep($seconds_to_sleep * 1000000);
+	sleep($seconds_to_sleep);
 
 	// Not our first run anymore!
 	$first_run = false;
