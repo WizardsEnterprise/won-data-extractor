@@ -1,5 +1,8 @@
 <?php
 class DataLoadLogDAO {
+	// Control whether or not we log full web service requests
+	public static $log_ws_requests = true;
+
 	public static function logEvent($db, $load_id, $event_func, $sequence_id, $event_type, $event_desc, $event_txt, $is_error = 0) {
 		//echo "data_load_log: $load_id, $event_func, $sequence_id, $event_type, $event_desc, $event_txt";
 		$id = $db->Insert("INSERT INTO data_load_log (data_load_id, event_func, sequence_id, event_type, event_desc, event_txt, is_error) VALUES (?, ?, ?, ?, ?, ?, ?)", array($load_id, $event_func, $sequence_id, $event_type, $event_desc, $event_txt, $is_error));
@@ -85,6 +88,9 @@ class DataLoadLogDAO {
 	}
 
 	public static function LogWebserviceRequest($db, $func_id, $url, $method = null, $proxy_array = false, $header_array = false, $data = null) {
+		if(self::$log_ws_requests === false)
+			return false;
+
 		$params = array();
 		$params[] = $func_id;
 		$params[] = $url;
@@ -105,6 +111,9 @@ class DataLoadLogDAO {
 	}
 
 	public static function LogWebserviceResponse($db, $request_id, $raw_response, $complete_seconds, $response_array = false) {
+		if($request_id === false || self::$log_ws_requests === false)
+			return false;
+
 		$params = array();
 		$params[] = $raw_response;
 		$params[] = $complete_seconds;
@@ -129,6 +138,9 @@ class DataLoadLogDAO {
 	}
 
 	public static function WebServiceStatusFailure($db, $request_id) {
+		if($request_id === false || self::$log_ws_requests === false)
+			return false;
+
 		$params = array();
 		$params[] = $request_id;
 

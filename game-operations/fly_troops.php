@@ -94,6 +94,12 @@ while(true) {
 		}
 	}
 
+	if(!$auth_result) {
+		echo "Sync or Authentication Failed. Quitting.\n";
+		DataLoadLogDAO::logEvent2($won->db, $func_log_id, $log_seq++, 'ERROR', 'Sync or Authentication Failed. Quitting.');	
+		break;
+	}
+
 	// Setup/clear out our lists
 	$bases = array();
 	$base_distances = array();

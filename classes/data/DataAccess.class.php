@@ -6,14 +6,18 @@ class DataAccess {
 	protected $errno = false;
 	protected $errorMsg = false;
 	protected $errorSql = false;
+
+	protected $retryDelay = 0;
 	
 	// Constructor - 
 	// Parameters: Host, Username, Password, Database
 	// Returns: Nothing
 	function DataAccess($in_dbhost, $in_dbuser, $in_dbpass, $in_dbname) {
 		try {
-			$this->conn = new PDO("mysql:host=$in_dbhost;dbname=$in_dbname", $in_dbuser, $in_dbpass);
-			$this->conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+			$attributes = array(PDO::ATTR_PERSISTENT => false,
+								PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION);
+
+			$this->conn = new PDO("mysql:host=$in_dbhost;dbname=$in_dbname", $in_dbuser, $in_dbpass, $attributes);
 		} catch (PDOException $e) {
 		    $this->errno = $e->getCode();
 			$this->errorMsg = $e->getMessage();			
@@ -49,7 +53,19 @@ class DataAccess {
 			$this->errorMsg = $e->getMessage();
 			$this->errorSql = "Error Executing Statement: \r\n".$query."\r\n".print_r($params, true);
 
+			// If this was a general error, pause and retry
+			// Note: this pause and retry infinitely logic basically assumes that all queries are vital to the program
+			// We should probably do something about that (example: for logging)
+			if($this->errno == 'HY000') {
+				echo "General Error.  Retrying in {$this->retryDelay} seconds.\n";
+				sleep($this->retryDelay);
+				$this->retryDelay += (5 + $this->retryDelay);
+				return $this->PrepareAndExecuteQuery($query, $params)
+			}
+
 			return false;
+		} finally {
+			$this->retryDelay = 0;
 		}
 		
 		return $stmt;
