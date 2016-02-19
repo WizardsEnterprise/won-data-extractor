@@ -60,7 +60,7 @@ class DataAccess {
 				echo "General Error.  Retrying in {$this->retryDelay} seconds.\n";
 				sleep($this->retryDelay);
 				$this->retryDelay += (5 + $this->retryDelay);
-				return $this->PrepareAndExecuteQuery($query, $params)
+				return $this->PrepareAndExecuteQuery($query, $params);
 			}
 
 			return false;
