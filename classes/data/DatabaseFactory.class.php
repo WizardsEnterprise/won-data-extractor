@@ -1,5 +1,5 @@
 <?php
-require_once(dirname(__FILE__) . '/DataAccess.class.php');
+require_once(dirname(__FILE__) . '/DataAccessManager.class.php');
 
 class DatabaseFactory {
 	private static $host = 'localhost';
@@ -10,9 +10,9 @@ class DatabaseFactory {
 	public static function getDatabase() {
 		switch(gethostname()) {
 			case 'WON-Data-Extractor': 
-				return new DataAccess('localhost', 'won_data_extract', '', self::$dbname);
+				return new DataAccessManager('localhost', 'won_data_extract', '', self::$dbname);
 			default:
-				return new DataAccess(self::$host, self::$user, self::$pass, self::$dbname);
+				return new DataAccessManager(self::$host, self::$user, self::$pass, self::$dbname);
 		}
 		
 	}
