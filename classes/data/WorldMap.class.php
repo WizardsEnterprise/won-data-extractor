@@ -161,6 +161,7 @@ class Hex extends ModelBase {
 	public $npc_player_id;
 	public $player_name;
 	public $player_level;
+	public $immune_until_ts;
 
 	// Base Info
 	public $town_id;

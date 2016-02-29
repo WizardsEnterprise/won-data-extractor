@@ -96,7 +96,7 @@ class LeaderboardExtractor {
 			$id = PlayerDAO::getLocalIdFromGameId($this->db, $player->game_player_id);
 			if($id) {
 				$player->id = $id;
-				PlayerDAO::updatePlayer($this->db, $player, array('guild_id'));
+				PlayerDAO::updatePlayer($this->db, $player, array('guild_id', 'immune_until'));
 			} else
 				PlayerDAO::insertPlayer($this->db, $player);
 				

@@ -185,6 +185,13 @@ class WorldMapExtractor {
 				$player->player_name = $hex->player_name;
 				$player->level = $hex->player_level;
 				$player->data_load_id = $this->data_load_id;
+
+				// Calculate the end of the player's bubble
+				if($hex->immune_until_ts > 0) {
+					$player->immune_until = date('Y-m-d H:i:s', $hex->immune_until_ts);
+				} else {
+					$player->immune_until = null;
+				}
 				
 				// If this player is in a guild, process that information
 				if(isset($hex->guild_id)) {

@@ -94,6 +94,9 @@ class PlayerDAO {
 		
 		if(!in_array('bases', $customExcludes) && $p1->bases != $p2->bases)
 			return true;
+
+		if(!in_array('immune_until', $customExcludes) && $p1->immune_until != $p2->immune_until)
+			return true;
 			
 		return false;
 	}
@@ -103,7 +106,7 @@ class PlayerMapper {
 	public static $mapping = array('id' => 'id', 'world_id' => 'world_id', 'game_player_id' => 'game_player_id',
 								   'player_name' => 'player_name', 'level' => 'level', 'battle_points' => 'battle_points', 
 								   'bases' => 'bases', 'guild_id' => 'guild_id', 'data_load_id' => 'data_load_id',
-								   'glory_points' => 'glory_points');
+								   'glory_points' => 'glory_points', 'immune_until' => 'immune_until');
 								
 	public static $excludeFromInsert = array('id');
 	public static $excludeFromUpdate = array('id', 'world_id', 'game_player_id');
@@ -129,6 +132,7 @@ class Player extends ModelBase {
 	public $level;
 	public $bases;
 	public $guild_id;
+	public $immune_until;
 	public $data_load_id;
 	public $mapper = 'PlayerMapper';
 }
