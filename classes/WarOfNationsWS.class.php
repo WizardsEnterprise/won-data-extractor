@@ -216,23 +216,59 @@ class WarOfNationsWS {
 		DataLoadLogDAO::logWebserviceResponse($this->db, $request_id, $decoded, $request_time, $json_array);
 		
 		// Validate that the request completed successfully
-		$this->ValidateResponse($json_array, $func_log_id, $request_id);
+		$status = $this->ValidateResponse($json_array, $func_log_id, $request_id);
+
+		if($status === 'retry') {
+			DataLoadLogDAO::logEvent2($this->db, $func_log_id, $log_seq++, 'ERROR', "Validation returned [$status].  Retrying request...", $response_string, 1);
+			echo "Validation returned [$status].  Retrying request...\n";
+
+			return $this->MakeRequest($endpoint, $data_string, $method, $retry_count + 1);
+		}
 
 		// Return the decoded string
 		return $json_array;
 	}
 
 	private function ValidateResponse($json_array, $func_log_id, $request_id) {
+		// These statuses will trigger an error state but not kill the program
+		$response_whitelist = array('EVENT_QUEUE_EXECUTE_NOW_FAILED');
+
 		// Validate that the request completed successfully
-		if($json_array['status'] == 'OK' && $json_array['responses'][0]['status'] == 'OK')
-			DataLoadLogDAO::completeFunction($this->db, $func_log_id, 'Request Successful');
-		else {
-			$status_str = "Statuses: [{$json_array['status']}], [{$json_array['responses'][0]['status']}]";
+		if($json_array['status'] == 'OK' && array_key_exists(0, $json_array['responses']) && array_key_exists('status', $json_array['responses'][0])) {
+			if($json_array['responses'][0]['status'] == 'OK') {
+				DataLoadLogDAO::completeFunction($this->db, $func_log_id, 'Request Successful');
+			} elseif(in_array($json_array['responses'][0]['status'], $response_whitelist)) {
+				$status_str = "Statuses: [{$json_array['status']}], [{$json_array['responses'][0]['status']}]";
+				
+				echo "Request Failed.  $status_str\nContinuing...\n";
+				DataLoadLogDAO::webServiceStatusFailure($this->db, $request_id);
+				DataLoadLogDAO::completeFunction($this->db, $func_log_id, "Request Failed.  $status_str", 1);
+				return 'retry';
+			} else {
+				$status_str = "Statuses: [{$json_array['status']}], [{$json_array['responses'][0]['status']}]";
+				
+				DataLoadLogDAO::webServiceStatusFailure($this->db, $request_id);
+				DataLoadLogDAO::completeFunction($this->db, $func_log_id, "Request Failed.  $status_str", 1);
+				DataLoadDAO::loadFailed($this->db, $this->data_load_id);
+				die("Data Load Failed. $status_str\n");
+			}
+		} elseif(array_key_exists(0, $json_array['responses']) && substr($json_array['responses'][0], 0, 9 ) === 'EXCEPTION') {
+			$status_str = "Statuses: [{$json_array['status']}], [{$json_array['responses'][0]}]";
+			
+			echo "Request Failed.  $status_str\nContinuing...\n";
+			DataLoadLogDAO::webServiceStatusFailure($this->db, $request_id);
+			DataLoadLogDAO::completeFunction($this->db, $func_log_id, "Request Failed.  $status_str", 1);
+			return 'retry';
+		} else {
+			$status_str = "Statuses: [{$json_array['status']}], [{$json_array['responses'][0]}]";
+			
 			DataLoadLogDAO::webServiceStatusFailure($this->db, $request_id);
 			DataLoadLogDAO::completeFunction($this->db, $func_log_id, "Request Failed.  $status_str", 1);
 			DataLoadDAO::loadFailed($this->db, $this->data_load_id);
 			die("Data Load Failed. $status_str\n");
 		}
+
+		return true;
 	}
 }
 ?>
