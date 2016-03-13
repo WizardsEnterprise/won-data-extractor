@@ -30,8 +30,11 @@ class DataAccessManager extends DataAccess{
 		if(!$stmt) {
 			// If this was a general error, attempt to reconnect and retry the query
 			if($this->errno == 'HY000') {
-				echo "Database Error.  Attempting to Reconnect.\n";
-
+				echo "Database Error.  Waiting 1 minute before attempting to Reconnect.\n";
+				sleep(60);
+				echo "Attempting to reconnect...\n";
+				
+				$this->conn = null;
 				$this->connect($this->host, $this->user, $this->pass, $this->dbname);
 
 				if(!$this->hasError())
