@@ -73,7 +73,7 @@ class WarOfNationsDataExtractor {
 	
 	public function MakeRequest($method, $params = array()) {
 		// Get our request properties from the database
-		if (!in_array($method, $this->request_cache)) {
+		if (!array_key_exists($method, $this->request_cache)) {
 			$request = ServiceRequestDAO::getServiceRequestByMethod($this->db, $method);
 
 			if(!$request) {
