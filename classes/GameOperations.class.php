@@ -32,6 +32,10 @@ class GameOperations {
 	// Attack Type Mapping
 	private static $attack_type_mapping = array('Capture' => 0, 'Attack' => 1);
 
+	// Response Reason Whitelist
+	private static $response_whitelist = array('EVENT_QUEUE_EXECUTE_NOW_FAILED');
+		
+
 	function __construct($db, $de, $dlid, $auth) {
 		$this->db = $db;
 		$this->de = $de;
@@ -174,13 +178,23 @@ class GameOperations {
 		$params['dest_town_id'] = $dest_town_id;
 
 		$result = $this->de->MakeRequest('SEND_ARMY_TO_TOWN', $params);
+
+		// If we failed, return false
 		if(!$result) return false;
 
+		// If we got to this point, then we think we succeeded... try to process the response
 		$success = $result['responses'][0]['return_value']['success'];
 
-		if($success != 1){
+		if($success != 1) {
 			$reason = $result['responses'][0]['return_value']['reason'];
 			echo "Failed to send army to town: [$reason]\r\n";
+
+			if(in_array($reason, self::$response_whitelist)) {
+				echo "Reason is in whitelist.  Wait 10 seconds and retry\n";
+				sleep(10);
+
+				return $this->sendArmyToTown($origin_town_id, $dest_town_id, $units);
+			}
 
 			DataLoadLogDAO::completeFunction($this->db, $func_log_id, "Failed to send army to town: $reason", 1);
 
