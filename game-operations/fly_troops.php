@@ -16,7 +16,7 @@ function base_sort_last_attacked($a, $b) {
 /*************** Initialize Settings ***************/
 $device_id = false;
 $first_run = true;
-$max_army_size = 1900; // Keep this the same across all bases.  Minimum of all bases' army size
+$max_army_size = 2700; // Keep this the same across all bases.  Minimum of all bases' army size
 $max_waves = 10; // Max number of waves that can be sent from 1 base
 $preferred_distance = 700; // Preferred flight distance, use this to balance flight time
 
