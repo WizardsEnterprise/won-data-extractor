@@ -19,7 +19,11 @@ class DataAccess {
 	}
 
 	protected function connect($in_dbhost, $in_dbuser, $in_dbpass, $in_dbname) {
-		try {		
+		try {
+			$this->errno = false;
+			$this->errorMsg = false;
+			$this->errorSql = false;
+			
 			$attributes = array(PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION);
 			$this->conn = new PDO("mysql:host=$in_dbhost;dbname=$in_dbname", $in_dbuser, $in_dbpass, $attributes);
 		} catch (PDOException $e) {
