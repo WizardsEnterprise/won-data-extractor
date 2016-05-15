@@ -1,5 +1,4 @@
 <?php
-require_once(dirname(__FILE__) . '/Constants.class.php');
 require_once(dirname(__FILE__) . '/data/DataLoadLog.class.php');
 
 class WarOfNationsWS {
