@@ -30,7 +30,7 @@ class DataAccessManager extends DataAccess{
 		if(!$stmt) {
 			// If this was a general error, attempt to reconnect and retry the query
 			// UPDATED: Only care about specific general errors
-			if($this->errno == 'HY000' && strpos($this->errorMsg, 'General error: 2006 MySQL server has gone away') {
+			if($this->errno == 'HY000' && strpos($this->errorMsg, 'General error: 2006 MySQL server has gone away') !== false) {
 				echo "Database Error.  Waiting 1 minute before attempting to Reconnect.\n";
 				sleep(60);
 				echo "Attempting to reconnect...\n";
