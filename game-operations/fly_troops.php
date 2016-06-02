@@ -16,7 +16,7 @@ function base_sort_last_attacked($a, $b) {
 /*************** Initialize Settings ***************/
 $device_id = false;
 $first_run = true;
-$max_army_size = 2700; // Keep this the same across all bases.  Minimum of all bases' army size
+$max_army_size = 3100; // Keep this the same across all bases.  Minimum of all bases' army size
 $max_waves = 10; // Max number of waves that can be sent from 1 base
 $preferred_distance = 700; // Preferred flight distance, use this to balance flight time
 
@@ -25,10 +25,10 @@ $seconds_between_waves = 2;
 $seconds_between_bases = 5;
 $hours_between_sessions = 6;
 
-// Order to fly troops out of base (most valuable first)
-$fly_order = array('Railgun Tank', 'Titan', 'Hellfire', 'Centurion', 'Hailstorm', 'Arachnid',
-				   'Hawk', 'Hammerhead', 'Rocket Truck', 'Transport', 'Bomber', 'Helicopter', 
-				   'Tank', 'Jeep', 'Artillery');
+// Order to fly troops out of base (most valuable first, except artillery)
+$fly_order = array('Doom Walker', 'Heavy Gunship', 'Blaze Launcher', 'Railgun Tank', 'Titan', 'Hellfire', 
+				   'Centurion', 'Hailstorm', 'Arachnid', 'Hawk', 'Hammerhead', 'Rocket Truck', 
+				   'Transport', 'Bomber', 'Helicopter', 'Tank', 'Jeep', 'Artillery');
 
 // Unit to use for ensuring all waves travel the same speed
 $slow_unit = 'Artillery';
@@ -96,7 +96,7 @@ while(true) {
 
 	if(!$auth_result) {
 		echo "Sync or Authentication Failed. Quitting.\n";
-		DataLoadLogDAO::logEvent2($won->db, $func_log_id, $log_seq++, 'ERROR', 'Sync or Authentication Failed. Quitting.');	
+		DataLoadLogDAO::logEvent2($won->db, $func_log_id, $log_seq++, 'ERROR', 'Sync or Authentication Failed. Quitting.', null, 1);	
 		break;
 	}
 
@@ -336,8 +336,13 @@ while(true) {
 			$army = $game->SendArmyToTown($base_id, $target_base_id, $wave);
 
 			// If we failed to send the wave, stop, and attempt to figure out why
-			if(!$army) {
-				die("Error Detected. Quitting.\n\n");	
+			if(!is_array($army)) {
+				if($army == 'NOT_ENOUGH_UNITS') {
+					// Ignore this error, try to continue anyway
+					DataLoadLogDAO::logEvent2($won->db, $func_log_id, $log_seq++, 'ERROR', "'$army' error sending wave #$wave_count from {$base['name']}", null, 1);	
+				} else {
+					die("Error Detected. Quitting.\n\n");
+				}
 			}
 
 			// Calculate our arrival time, and save the latest arrival to each base

@@ -27,7 +27,10 @@ class GameOperations {
 										 'Hellfire' => 1012, 
 										 'Railgun Tank' => 1002,
 										 'Transport' => 1008,
-										 'Bomber' => 1010);
+										 'Bomber' => 1010,
+										 'Blaze Launcher' => 1101,
+										 'Heavy Gunship' => 1102,
+										 'Doom Walker' => 1103);
 	
 	// Attack Type Mapping
 	private static $attack_type_mapping = array('Capture' => 0, 'Attack' => 1);
@@ -35,6 +38,8 @@ class GameOperations {
 	// Response Reason Whitelist
 	private static $response_whitelist = array('EVENT_QUEUE_EXECUTE_NOW_FAILED');
 		
+	// Public status accessors
+	public $last_reason = false;
 
 	function __construct($db, $de, $dlid, $auth) {
 		$this->db = $db;
@@ -198,7 +203,7 @@ class GameOperations {
 
 			DataLoadLogDAO::completeFunction($this->db, $func_log_id, "Failed to send army to town: $reason", 1);
 
-			return false;
+			return $reason;
 		}
 
 		$army = $result['responses'][0]['return_value']['player_army'];
