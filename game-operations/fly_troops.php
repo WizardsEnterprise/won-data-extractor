@@ -125,7 +125,8 @@ while(true) {
 	foreach($auth_result['responses'][0]['return_value']['player_town_reserves'] as $reserve) {
 		$bases[$reserve['town_id']]['units'] = array();
 		foreach($reserve['units'] as $unit) {
-			$bases[$reserve['town_id']]['units'][$unit_map[$unit['unit_id']]] = $unit['amount'];
+			if(in_array($unit['unit_id'], $unit_map))
+				$bases[$reserve['town_id']]['units'][$unit_map[$unit['unit_id']]] = $unit['amount'];
 		}
 	}
 

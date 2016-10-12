@@ -30,7 +30,8 @@ class GameOperations {
 										 'Bomber' => 1010,
 										 'Blaze Launcher' => 1101,
 										 'Heavy Gunship' => 1102,
-										 'Doom Walker' => 1103);
+										 'Doom Walker' => 1103,
+										 'Stealth Drone' => 1014);
 	
 	// Attack Type Mapping
 	private static $attack_type_mapping = array('Capture' => 0, 'Attack' => 1);
@@ -426,6 +427,37 @@ class GameOperations {
 		echo "Sent!\r\n\r\n";
 
 		DataLoadLogDAO::completeFunction($this->db, $func_log_id, "Successfully sent [$message] to [$chat_stream]");
+
+		return $result;
+	}
+
+	public function PurchaseXlabItem($item_id, $item_quantity) {
+		$log_seq = 0;
+		$func_args = func_get_args();
+		$func_log_id = DataLoadLogDAO::startFunction($this->db, $this->data_load_id, __CLASS__,  __FUNCTION__, $func_args);
+
+		echo "Buying item [$item_id]...\r\n";
+
+		$params = array();
+		$params['item_id'] = $item_id;
+		$params['item_quantity'] = $item_quantity;
+		
+		$result = $this->de->MakeRequest('PURCHASE_XLAB', $params);
+		if(!$result) return false;
+
+		$success = $result['responses'][0]['return_value']['success'];
+		if($success != 1) {
+			$reason = $result['responses'][0]['return_value']['reason'];
+			echo "Failed to buy xlab item: [$reason]\r\n";
+
+			DataLoadLogDAO::completeFunction($this->db, $func_log_id, "Failed to buy xlab item: [$reason]", 1);
+
+			return $reason;
+		} 
+
+		echo "Purchased!\r\n\r\n";
+
+		DataLoadLogDAO::completeFunction($this->db, $func_log_id, "Successfully Purchased [$item_quantity] of Xlab Item [$item_id]");
 
 		return $result;
 	}
