@@ -26,6 +26,7 @@ class DataAccess {
 			
 			$attributes = array(PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION);
 			$this->conn = new PDO("mysql:host=$in_dbhost;dbname=$in_dbname", $in_dbuser, $in_dbpass, $attributes);
+			$this->conn->setAttribute(PDO::MYSQL_ATTR_USE_BUFFERED_QUERY, false);
 		} catch (PDOException $e) {
 		    $this->errno = $e->getCode();
 			$this->errorMsg = $e->getMessage();			
@@ -176,6 +177,18 @@ class DataAccess {
 			return false;
 		
 		return true;
+	}
+
+	// Select - Executes the passed Select statement, returns array of all results
+	// Parameters: Query, Array of Parameters
+	// Returns: The statement object from the select query on success, FALSE otherwise
+	function SelectFetch($query, $params = array()) {
+		$stmt = $this->PrepareAndExecuteQuery($query, $params);
+		
+		// If the statement failed to execute, return false
+		if (!$stmt) return false;
+		
+		return $stmt;
 	}
 }
 

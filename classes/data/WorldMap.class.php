@@ -11,9 +11,9 @@ class WorldMapDAO {
 	}
 
 	private static function build_hex_cache($db, $world_id) {
-		$hexes = $db->select("SELECT x_coord, y_coord FROM world_hexes where world_id=?", array($world_id));
+		$hexes = $db->selectFetch("SELECT x_coord, y_coord FROM world_hexes WHERE world_id=?", array($world_id));
 
-		foreach($hexes as $i => $hex) {
+		while ($hex = $hexes->fetch(PDO::FETCH_ASSOC)) {
 			self::$hex_cache[$hex['x_coord'].', '.$hex['y_coord']] = 1;
 		}
 
