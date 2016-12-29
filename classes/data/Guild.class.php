@@ -3,12 +3,19 @@ require_once(dirname(__FILE__) . '/MapperHelper.class.php');
 require_once(dirname(__FILE__) . '/ModelBase.class.php');
 
 class GuildDAO {
+	// Cache these for performance during world map extractor
+	private static $guild_cache = array();
+
 	public static function getAllGuilds($db) {
 		return $db->select("SELECT * FROM guilds");
 	}
 	
 	public static function getLocalIdFromGameId($db, $game_id) {
-		return $db->selectValue("SELECT id FROM guilds WHERE game_guild_id=?", array($game_id));
+		if(isset($game_id, self::$guild_cache))
+			return $guild_cache[$game_id];
+
+		// If it's not there... find it, save it, and return it
+		return $guild_cache[$game_id] = $db->selectValue("SELECT id FROM guilds WHERE game_guild_id=?", array($game_id));
 	}
 	
 	public static function insertGuild($db, $Guild) {

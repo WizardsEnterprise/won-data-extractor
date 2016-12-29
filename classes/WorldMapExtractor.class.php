@@ -240,7 +240,7 @@ class WorldMapExtractor {
 
 					}
 				}
-			} else if ($player->player_name){
+			} else if ($hex->command_center === true && $player->player_name){
 				//DataLoadLogDAO::logEvent2($this->db, $func_log_id, $log_seq++, 'DEBUG', "Updating Player [{$player->player_name}] in World [{$player->world_id}]", var_export($player, true));
 
 				// Update the player, but exclude battle points, power, and the number of bases because these aren't available in this case

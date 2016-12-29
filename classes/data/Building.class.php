@@ -9,7 +9,7 @@ class BuildingDAO {
 	
 	public static function getLocalIdFromGameId($db, $game_building_id) {
 		// Try to find the building in cache
-		if(array_key_exists($game_building_id, self::$building_cache))
+		if(isset($game_building_id, self::$building_cache))
 			return $building_cache[$game_building_id];
 
 		// If it's not there... find it, save it, and return in

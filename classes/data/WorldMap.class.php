@@ -3,14 +3,34 @@ require_once(dirname(__FILE__) . '/MapperHelper.class.php');
 require_once(dirname(__FILE__) . '/ModelBase.class.php');
 
 class WorldMapDAO {
+	private static $cache_init = false;
+	private static $hex_cache = array();
+
 	public static function getAllHexes($db) {
 		return $db->select("SELECT * FROM world_hexes");
 	}
+
+	private static function build_hex_cache($db, $world_id) {
+		$hexes = $db->select("SELECT x_coord, y_coord FROM world_hexes");
+
+		foreach($hexes as $i => $hex) {
+			self::$hex_cache[] = $hex['x_coord'].', '.$hex['y_coord'];
+		}
+
+		self::$cache_init = true;
+	}
 	
 	public static function checkHexExists($db, $world_id, $x_coord, $y_coord) {
-		$count = $db->selectValue("SELECT count(*) FROM world_hexes WHERE world_id=? AND x_coord=? AND y_coord=?", array($world_id, $x_coord, $y_coord));
+		if(self::$cache_init === false) 
+			self::build_hex_cache($db, $world_id);
+
+		if(isset("$x_coord, $y_coord", self::$hex_cache))
+			return true;
+
+		return false;
+		//$count = $db->selectValue("SELECT count(*) FROM world_hexes WHERE world_id=? AND x_coord=? AND y_coord=?", array($world_id, $x_coord, $y_coord));
 	
-		return ($count > 0);
+		//return ($count > 0);
 	}
 	
 	public static function insertHex($db, $Hex) {

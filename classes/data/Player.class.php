@@ -3,6 +3,9 @@ require_once(dirname(__FILE__) . '/MapperHelper.class.php');
 require_once(dirname(__FILE__) . '/ModelBase.class.php');
 
 class PlayerDAO {
+	// Cache these for performance during world map extractor
+	private static $player_cache = array();
+
 	public static function getAllPlayers($db) {
 		return $db->select("SELECT * FROM players");
 	}
@@ -11,8 +14,12 @@ class PlayerDAO {
 		return $db->selectOne("SELECT * FROM players WHERE id=?", array($player_id));
 	}
 	
-	public static function getLocalIdFromGameId($db, $game_id) {
-		return $db->selectValue("SELECT id FROM players WHERE game_player_id=?", array($game_id));
+	public static function getLocalIdFromGameId($db, $game_player_id) {
+		if(isset($game_player_id, self::$player_cache))
+			return $player_cache[$game_player_id];
+
+		// If it's not there... find it, save it, and return it
+		return $player_cache[$game_player_id] = $db->selectValue("SELECT id FROM players WHERE game_player_id=?", array($game_player_id));
 	}
 	
 	public static function insertPlayer($db, $Player, $hist = false) {
