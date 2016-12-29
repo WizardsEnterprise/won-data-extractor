@@ -11,7 +11,7 @@ class WorldMapDAO {
 	}
 
 	private static function build_hex_cache($db, $world_id) {
-		$hexes = $db->select("SELECT x_coord, y_coord FROM world_hexes");
+		$hexes = $db->select("SELECT x_coord, y_coord FROM world_hexes where world_id=?", array($world_id));
 
 		foreach($hexes as $i => $hex) {
 			self::$hex_cache[$hex['x_coord'].', '.$hex['y_coord']] = 1;
