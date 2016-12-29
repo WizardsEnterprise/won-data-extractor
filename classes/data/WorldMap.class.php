@@ -14,7 +14,7 @@ class WorldMapDAO {
 		$hexes = $db->select("SELECT x_coord, y_coord FROM world_hexes");
 
 		foreach($hexes as $i => $hex) {
-			self::$hex_cache[] = $hex['x_coord'].', '.$hex['y_coord'];
+			self::$hex_cache[$hex['x_coord'].', '.$hex['y_coord']] = 1;
 		}
 
 		self::$cache_init = true;
@@ -24,7 +24,7 @@ class WorldMapDAO {
 		if(self::$cache_init === false) 
 			self::build_hex_cache($db, $world_id);
 
-		if(isset("$x_coord, $y_coord", self::$hex_cache))
+		if(isset(self::$hex_cache["$x_coord, $y_coord"]))
 			return true;
 
 		return false;

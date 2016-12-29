@@ -15,7 +15,7 @@ class PlayerDAO {
 	}
 	
 	public static function getLocalIdFromGameId($db, $game_player_id) {
-		if(isset($game_player_id, self::$player_cache))
+		if(isset(self::$player_cache[$game_player_id]))
 			return $player_cache[$game_player_id];
 
 		// If it's not there... find it, save it, and return it

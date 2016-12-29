@@ -11,7 +11,7 @@ class GuildDAO {
 	}
 	
 	public static function getLocalIdFromGameId($db, $game_id) {
-		if(isset($game_id, self::$guild_cache))
+		if(isset(self::$guild_cache[$game_id]))
 			return $guild_cache[$game_id];
 
 		// If it's not there... find it, save it, and return it
