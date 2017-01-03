@@ -16,7 +16,7 @@ function base_sort_last_attacked($a, $b) {
 /*************** Initialize Settings ***************/
 $device_id = false;
 $first_run = true;
-$max_army_size = 3100; // Keep this the same across all bases.  Minimum of all bases' army size
+$max_army_size = 4000; // Keep this the same across all bases.  Minimum of all bases' army size
 $max_waves = 10; // Max number of waves that can be sent from 1 base
 $preferred_distance = 700; // Preferred flight distance, use this to balance flight time
 
@@ -63,7 +63,7 @@ $func_log_id = DataLoadLogDAO::startFunction($won->db, $won->data_load_id, 'FlyT
 
 while(true) {
 	// Check configuration to make sure we aren't supposed to stop - this is the kill switch
-	$stop = PgrmConfigDAO::getConfigProperty($won->db, 'value1', 'STOP_TROOP_FLYER');
+	$stop = PgrmConfigDAO::getConfigProperty($won->db, 'value1', 'TROOP_FLYER', 'STOP');
 	if($stop == 'Y') {
 		echo "Stop Signal Detected!\n";
 		DataLoadLogDAO::logEvent2($won->db, $func_log_id, $log_seq++, 'INFO', 'Stop Signal Detected!');	
@@ -100,6 +100,14 @@ while(true) {
 		break;
 	}
 
+	// Get the max army size from the db so that we can update it without redeploying code
+	$new_max_army_size = PgrmConfigDAO::getConfigProperty($won->db, 'value1', 'TROOP_FLYER', 'ARMY_SIZE');
+
+	if($new_max_army_size != $max_army_size) {
+		DataLoadLogDAO::logEvent2($won->db, $func_log_id, $log_seq++, 'INFO', "Max Army Size Changed From $max_army_size to $new_max_army_size");	
+		$max_army_size = $new_max_army_size;
+	}
+
 	// Setup/clear out our lists
 	$bases = array();
 	$base_distances = array();
@@ -121,12 +129,21 @@ while(true) {
 	// Sort the bases in priority order (will sort by last time attacked)
 	uasort($bases, 'base_sort_last_attacked');
 
+	//DataLoadLogDAO::logEvent2($won->db, $func_log_id, $log_seq++, 'DEBUG', 'Unit Map', print_r($unit_map, true));	
+
 	// Fill in the units currently available at each base so that we can fly them
 	foreach($auth_result['responses'][0]['return_value']['player_town_reserves'] as $reserve) {
 		$bases[$reserve['town_id']]['units'] = array();
+
+		//DataLoadLogDAO::logEvent2($won->db, $func_log_id, $log_seq++, 'DEBUG', 'Town Reserves #'.$reserve['town_id'], print_r($reserve, true));	
+
 		foreach($reserve['units'] as $unit) {
-			if(in_array($unit['unit_id'], $unit_map))
+			//DataLoadLogDAO::logEvent2($won->db, $func_log_id, $log_seq++, 'DEBUG', 'Unit '.$unit_map[$unit['unit_id']], print_r($unit, true));	
+
+			if(isset($unit_map[$unit['unit_id']]))
 				$bases[$reserve['town_id']]['units'][$unit_map[$unit['unit_id']]] = $unit['amount'];
+			else
+				DataLoadLogDAO::logEvent2($won->db, $func_log_id, $log_seq++, 'ERROR', 'Unit ['.$unit['unit_id'].'] Not Found', print_r($unit, true), 1);	
 		}
 	}
 
@@ -198,9 +215,12 @@ while(true) {
 
 		// This should never happen
 		if($seconds_to_sleep < 0)
-			die("Error: Time to Wait is less than 0.  Quitting.\n\n");
+			DataLoadLogDAO::logEvent2($won->db, $func_log_id, $log_seq++, 'ERROR', "Seconds to sleepd ($seconds_to_sleep) is less than 0", null, 1);	
 
-		sleep($seconds_to_sleep);
+		// Due to delays from poor web service or database response times, 
+		// we sometimes get negative seconds to sleep, which breaks the sleep function
+		if($seconds_to_sleep > 0)
+			sleep($seconds_to_sleep);
 
 		// Have to reset first_run here or we're in trouble
 		$first_run = false;
